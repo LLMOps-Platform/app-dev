@@ -148,9 +148,14 @@ def tag_version_release(app_name, zip_path, tag, commit_message):
     return True
 
 
-## Server List
-gradio_servers = {}
 
+#############################################
+# Global Gradio Server Structure            #
+#############################################
+# New structure: { model_name: { "running_instances": [ { "port": int, "process": Process or None } ],
+#                                 "deploying": Boolean,
+#                                 "deploy_instance": { "port": int, "process": Process or None } or None } }
+gradio_servers = {}
 
 #############################################
 # Deployment Function                       #
@@ -163,52 +168,46 @@ def log_message(log_file_path, message):
         lf.write(f"[{timestamp}] {message}\n")
 
 def deploy_model(model_name, zip_path, descriptor):
-    """
-    Deploys the packaged model by extracting the zip package (built from the release folder)
-    into deployed_models/<port>, creating a virtual environment, installing dependencies,
-    and logging every step. Returns a port number.
-    """
     import datetime
     print(f"Deploying model {model_name}...")
     deployed_dir = os.path.join("deployed_models")
     os.makedirs(deployed_dir, exist_ok=True)
-
-    # Get an available port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         port_no = s.getsockname()[1]
-
     model_deploy_dir = os.path.join(deployed_dir, f"{port_no}")
     os.makedirs(model_deploy_dir, exist_ok=True)
 
-    # Create and initialize the instance log file
+    gradio_servers.setdefault(model_name, {
+         "running_instances": [],
+         "deploying": False,
+         "deploy_instance": None
+    })
+    gradio_servers[model_name]["deploying"] = True
+    gradio_servers[model_name]["deploy_instance"] = {"port": port_no}
+
     log_file_path = os.path.join(model_deploy_dir, "instance.log")
     log_message(log_file_path, f"Starting deployment of model '{model_name}' on port {port_no}.")
-
-    # Extract the zip package (which contains files from the release folder)
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(model_deploy_dir)
+         zip_ref.extractall(model_deploy_dir)
     log_message(log_file_path, "Extracted deployment package.")
 
-    # Prepare deployment descriptor info
     deployed_descriptor_path = os.path.join(model_deploy_dir, "descriptor.json")
     descriptor_data = descriptor.copy()
     if "model_name" not in descriptor_data:
-        descriptor_data["model_name"] = model_name
-
+         descriptor_data["model_name"] = model_name
     descriptor_data["deployed_at"] = datetime.datetime.now().isoformat()
 
-    # Set Gradio environment variables if applicable
+    # Define env once.
     env = os.environ.copy()
     if descriptor.get("interface_type", "gradio") == "gradio":
-        env["GRADIO_SERVER_PORT"] = str(port_no)
-        env["GRADIO_ROOT_PATH"] = "/model/" + model_name
+         env["GRADIO_SERVER_PORT"] = str(port_no)
+         env["GRADIO_ROOT_PATH"] = "/model/" + model_name
 
     with open(deployed_descriptor_path, "w") as dest_file:
-        json.dump(descriptor_data, dest_file, indent=4)
+         json.dump(descriptor_data, dest_file, indent=4)
     log_message(log_file_path, "Deployment descriptor updated.")
 
-    # Create a virtual environment and install dependencies
     venv_path = os.path.join(model_deploy_dir, "venv")
     log_message(log_file_path, "Creating virtual environment.")
     subprocess.run(["python", "-m", "venv", venv_path], env=env, check=True)
@@ -219,11 +218,22 @@ def deploy_model(model_name, zip_path, descriptor):
     log_message(log_file_path, "Pip upgraded.")
 
     for dependency in descriptor_data["requirements"]:
-        subprocess.run([pip_command, "install", dependency], check=True)
-        log_message(log_file_path, f"Installed dependency: {dependency}")
+         subprocess.run([pip_command, "install", dependency], check=True)
+         log_message(log_file_path, f"Installed dependency: {dependency}")
 
+    # Use Popen instead of run to make it non-blocking
+    python_executable = os.path.join(venv_path, 'bin', 'python') if os.name != "nt" else os.path.join(venv_path, 'Scripts', 'python')
+    cmd = [python_executable, os.path.join(model_deploy_dir, 'app.py')]
+    process = subprocess.Popen(cmd, env=env)
     app.logger.info(f"Model {model_name} deployed on port {port_no}")
-    log_message(log_file_path, f"Deployment completed successfully on port {port_no}.")
+    log_message(log_file_path, f"Deployment started successfully on port {port_no}.")
+
+    gradio_servers[model_name]["deploying"] = False
+    gradio_servers[model_name]["deploy_instance"] = None
+    gradio_servers[model_name].setdefault("running_instances", []).append({
+         "port": port_no,
+         "process": process
+    })
     return port_no
 
 
@@ -242,12 +252,14 @@ def package_model(model_name, model_def_file, weights_file, req_file):
     import json
     model_folder = os.path.join(UPLOAD_FOLDER, secure_filename(model_name))
     release_folder = os.path.join(model_folder, "release")
+    src_folder = os.path.join(model_folder, "src")
     os.makedirs(release_folder, exist_ok=True)
+    os.makedirs(src_folder, exist_ok=True)
 
-    # Save raw files directly in release
-    model_def_path = os.path.join(release_folder, "app.py")
-    weights_path = os.path.join(release_folder, secure_filename(weights_file.filename))
-    req_path = os.path.join(release_folder, "requirements.txt")
+    # Save raw files directly in source folder
+    model_def_path = os.path.join(src_folder, "app.py")
+    weights_path = os.path.join(src_folder, secure_filename(weights_file.filename))
+    req_path = os.path.join(src_folder, "requirements.txt")
     model_def_file.save(model_def_path)
     weights_file.save(weights_path)
     req_file.save(req_path)
@@ -273,17 +285,18 @@ def package_model(model_name, model_def_file, weights_file, req_file):
     with open(descriptor_path, 'w') as f:
         json.dump(descriptor, f, indent=4)
 
-    # Create zip package containing descriptor and release folder files
+    # Create zip package containing files directly (not relative to release folder)
     zip_filename = f"{secure_filename(model_name)}.zip"
     zip_path = os.path.join(release_folder, zip_filename)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(release_folder):
-            for file in files:
-                if file == zip_filename:
-                    continue
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, release_folder)
-                zipf.write(file_path, arcname=arcname)
+        # Add app.py
+        zipf.write(os.path.join(src_folder, "app.py"), arcname="app.py")
+        # Add weights file
+        zipf.write(os.path.join(src_folder, secure_filename(weights_file.filename)), 
+                  arcname=secure_filename(weights_file.filename))
+        # Add requirements file
+        zipf.write(os.path.join(src_folder, "requirements.txt"), arcname="requirements.txt")
+        
     return descriptor, zip_path
 #############################################
 # Flask Routes                              #
@@ -341,84 +354,49 @@ def list_models():
     return render_template("models.html", models=models)
 
 
-
 @app.route("/model/<model_name>", methods=["GET"])
 def model_specific(model_name):
     if model_name not in os.listdir(UPLOAD_FOLDER):
         return "Model not found", 404
 
-    descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "descriptor.json")
+    descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "release/descriptor.json")
     if not os.path.exists(descriptor_path):
         return f"Descriptor file for model {model_name} not found", 404
     with open(descriptor_path, 'r') as f:
         descriptor = json.load(f)
 
-    interface_type = descriptor.get("interface_type", "gradio")
-    port_no = descriptor.get("port", None)
-    if port_no is None:
-        return f"Model {model_name} is not properly deployed (no port defined)", 400
-    if interface_type != "gradio":
-        return f"Interface type {interface_type} is not supported", 400
+    # If there is already a running instance, return it.
+    if model_name in gradio_servers and gradio_servers[model_name]["running_instances"]:
+        instance = gradio_servers[model_name]["running_instances"][0]
+        return render_template("model_interface.html", model_name=model_name, port=instance["port"])
 
-    # If model deployment is not registered, deploy using our deploy_model function only.
-    if model_name not in gradio_servers:
-        gradio_servers[model_name] = []
-        # Locate the release zip package
-        release_folder = os.path.join(UPLOAD_FOLDER, model_name, "release")
+    # Otherwise, deploy the model using deploy_models.
+    if model_name not in gradio_servers or (gradio_servers[model_name]["deploying"] == False):
         import glob
+        release_folder = os.path.join(UPLOAD_FOLDER, model_name, "release")
         zip_files = glob.glob(os.path.join(release_folder, "*.zip"))
         if not zip_files:
             return "No deployment package found", 404
         zip_path = zip_files[0]
-        new_port = deploy_model(model_name, zip_path, descriptor)
-        if new_port is None:
-            return "Failed to deploy model", 500
-        # Do not launch a server via subprocess; simply record the deployed port.
-        gradio_servers[model_name].append(new_port)
-        return render_template("model_interface.html", model_name=model_name, port=new_port)
-    else:
-        port = gradio_servers[model_name]["port"]
+        port = deploy_model(model_name, zip_path, descriptor)
         return render_template("model_interface.html", model_name=model_name, port=port)
+    
+    return redirect(url_for("instances_model", model_name=model_name))
 
-# Endpoint to handle model API requests does not get called in frontend
-@app.route("/model/<model_name>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-def proxy_model_api(model_name, subpath):
-    if model_name not in gradio_servers:
-        return f"Model {model_name} is not running", 404
 
-    port = gradio_servers[model_name][0]
-    target_url = f"http://localhost:{port}/{subpath}"
-    params = dict(request.args)
-    if "session_hash" not in params:
-        params["session_hash"] = "1234"
-    print(f"Proxying request for {model_name} to {target_url} with params {params}")
-
-    resp = requests.request(
-        method=request.method,
-        url=target_url,
-        params=params,
-        headers={key: value for key, value in request.headers if key != "Host"},
-        data=request.get_data(),
-        cookies=request.cookies,
-        allow_redirects=False
-    )
-    excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
-    headers = [(name, value) for name, value in resp.raw.headers.items() if name.lower() not in excluded_headers]
-    return Response(resp.content, resp.status_code, headers)
 
 # Endpoint to display API documentation for the model
-# In server.py, update the /model/<model_name>/api_doc route
 @app.route("/model/<model_name>/api_doc")
 def api_doc_model(model_name):
     import json
 
     # Check that the model folder exists
-    if model_name not in os.listdir(UPLOAD_FOLDER):
+    if (model_name not in os.listdir(UPLOAD_FOLDER)):
         return "Model not found", 404
 
     # Determine the descriptor file path.
     # Adjust the location if your descriptor is stored in a subfolder (e.g. release)
-    descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "descriptor.json")
+    descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "release/descriptor.json")
     if not os.path.exists(descriptor_path):
         return f"Descriptor file for model {model_name} not found", 404
 
@@ -433,7 +411,6 @@ def api_doc_model(model_name):
     }
 
     # Allow the descriptor to provide additional customizations.
-    # For example, the number of endpoints and custom code snippets.
     num_endpoints = descriptor.get("num_api_endpoints", len(api_endpoints))
     code_snippets = descriptor.get("code_snippets", None)
 
@@ -452,27 +429,25 @@ def api_doc_model(model_name):
 
 @app.route("/model/<model_name>/instances")
 def instances_model(model_name):
-    # Get the packaged descriptor from the models folder
-    model_dir = os.path.join(UPLOAD_FOLDER, model_name)
-    descriptor_path = os.path.join(model_dir, "descriptor.json")
-    with open(descriptor_path, "r") as f:
-        descriptor_data = json.load(f)
-    ports = descriptor_data.get("instance_ports", [])
+    # Get running instances from gradio_servers
+    server_info = gradio_servers.get(model_name, {})
+    running_instances = server_info.get("running_instances", [])
+    deploy_instance = server_info.get("deploy_instance", None)
 
     instances = []
     deployed_dir = "deployed_models"
-    # For each port listed in instance_ports, get deployment details and logs
-    for port in ports:
+
+    # Build instance info from running instances
+    for inst in running_instances:
+        port = inst.get("port")
         instance_dir = os.path.join(deployed_dir, str(port))
         deployed_at = "Unknown"
         logs = ""
-        # Read the deployed descriptor
         instance_descriptor_path = os.path.join(instance_dir, "descriptor.json")
         if os.path.exists(instance_descriptor_path):
             with open(instance_descriptor_path, "r") as f:
                 instance_descriptor = json.load(f)
             deployed_at = instance_descriptor.get("deployed_at", "Unknown")
-        # Read the instance log file if available
         log_file = os.path.join(instance_dir, "instance.log")
         if os.path.exists(log_file):
             with open(log_file, "r") as lf:
@@ -480,10 +455,64 @@ def instances_model(model_name):
         instances.append({
             "port": port,
             "deployed_at": deployed_at,
-            "logs": logs
+            "logs": logs,
+            "running": True
         })
 
+    # Include deploy_instance info if available and not already listed
+    if deploy_instance:
+        port = deploy_instance.get("port")
+        if not any(inst.get("port") == port for inst in instances):
+            instance_dir = os.path.join(deployed_dir, str(port))
+            deployed_at = "Unknown"
+            logs = ""
+            instance_descriptor_path = os.path.join(instance_dir, "descriptor.json")
+            if os.path.exists(instance_descriptor_path):
+                with open(instance_descriptor_path, "r") as f:
+                    instance_descriptor = json.load(f)
+                deployed_at = instance_descriptor.get("deployed_at", "Unknown")
+            log_file = os.path.join(instance_dir, "instance.log")
+            if os.path.exists(log_file):
+                with open(log_file, "r") as lf:
+                    logs = lf.read()
+            instances.append({
+                "port": port,
+                "deployed_at": deployed_at,
+                "logs": logs,
+                "running": False
+            })
+
     return render_template("instances.html", model_name=model_name, instances=instances)
+
+
+# Endpoint to handle model API requests does not get called in frontend
+@app.route("/model/<model_name>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+def proxy_model_api(model_name, subpath):
+    if model_name not in gradio_servers or not gradio_servers[model_name]["running_instances"]:
+        return f"Model {model_name} is not running", 404
+
+    # Choose the first running instance.
+    instance = gradio_servers[model_name]["running_instances"][0]
+    port = instance["port"]
+
+    target_url = f"http://localhost:{port}/{subpath}"
+    params = dict(request.args)
+    if "session_hash" not in params:
+        params["session_hash"] = "1234"
+    print(f"Proxying request for {model_name} to {target_url} with params {params}")
+
+    resp = requests.request(
+        method=request.method,
+        url=target_url,
+        params=params,
+        headers={key: value for key, value in request.headers if key != "Host"},
+        data=request.get_data(),
+        cookies=request.cookies,
+        allow_redirects=False
+    )
+    excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+    headers = [(name, value) for name, value in resp.raw.headers.items() if name.lower() not in excluded_headers]
+    return Response(resp.content, resp.status_code, headers)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000, use_reloader=False)

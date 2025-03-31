@@ -2,5 +2,5 @@
 *pycache*
 *venv*
 .git
-models/
 deployed_models
+models/*/release
