@@ -51,12 +51,9 @@ def get_next_version(app_name):
 
 def tag_version_release(app_name, zip_path, tag, commit_message):
     """
-    Extracts the ZIP file (which should contain app.py, requirements.txt, and a model file),
-    then moves files into a versioned folder structure and tags the release in a Git repository.
+    Extracts the ZIP file, moves files into a versioned folder structure, and tags the release in Git.
     """
     full_tag = f"{app_name}_{tag}"  # e.g., ocr_v2.0
-
-    # Extract the ZIP file to a temporary directory
     temp_dir = tempfile.mkdtemp()
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -65,11 +62,9 @@ def tag_version_release(app_name, zip_path, tag, commit_message):
         print(f"Error: The file '{zip_path}' is not a valid zip file.")
         return False
 
-    # Identify expected files: app.py, requirements.txt, and a PyTorch model file (.pt or .pth)
     extracted_files = os.listdir(temp_dir)
     code_files = []
     model_file = None
-
     for filename in extracted_files:
         if filename in ["app.py", "requirements.txt"]:
             code_files.append(filename)
@@ -85,30 +80,23 @@ def tag_version_release(app_name, zip_path, tag, commit_message):
         shutil.rmtree(temp_dir)
         return False
 
-    # Define destination directories for versioning
     app_root = os.path.join(os.getcwd(), "versioned_models", app_name)
     release_dir = os.path.join(app_root, "release", tag)
     models_dir = os.path.join(app_root, "models")
-
     os.makedirs(app_root, exist_ok=True)
     os.makedirs(release_dir, exist_ok=True)
     os.makedirs(models_dir, exist_ok=True)
 
-    # Move code files (app.py and requirements.txt) to the release directory
     for file in code_files:
         src = os.path.join(temp_dir, file)
         dst = os.path.join(release_dir, file)
         shutil.move(src, dst)
-
-    # Move the model file to the models directory
     src_model = os.path.join(temp_dir, model_file)
     dst_model = os.path.join(models_dir, model_file)
     shutil.move(src_model, dst_model)
-
-    # Clean up the temporary directory
     shutil.rmtree(temp_dir)
 
-    # If the app_root is not already a Git repository, initialize it
+    # Git operations (initialization, LFS, commit, tagging) follow...
     if not os.path.isdir(os.path.join(app_root, ".git")):
         try:
             subprocess.run(["git", "init", app_root], check=True)
@@ -117,58 +105,52 @@ def tag_version_release(app_name, zip_path, tag, commit_message):
             print("❌ Git init failed. Ensure Git is installed.")
             return False
 
-    # Change working directory to the app root for subsequent Git commands
     current_dir = os.getcwd()
     os.chdir(app_root)
-
-    # Initialize Git LFS (make sure Git LFS is installed on your system)
     try:
         subprocess.run(["git", "lfs", "install"], check=True)
     except subprocess.CalledProcessError:
-        print("❌ Git LFS installation failed. Make sure Git LFS is installed on your system.")
+        print("❌ Git LFS installation failed.")
         os.chdir(current_dir)
         return False
 
-    # Track the model file with Git LFS using its relative path
     lfs_track_path = os.path.join("models", model_file)
     try:
         subprocess.run(["git", "lfs", "track", lfs_track_path], check=True)
     except subprocess.CalledProcessError:
-        print("❌ Git LFS tracking failed. Ensure the command is correct.")
+        print("❌ Git LFS tracking failed.")
         os.chdir(current_dir)
         return False
 
-    # Stage all changes in the repository
     try:
         subprocess.run(["git", "add", "."], check=True)
     except subprocess.CalledProcessError:
-        print("❌ Git add failed. Ensure you are in the correct repository.")
+        print("❌ Git add failed.")
         os.chdir(current_dir)
         return False
 
-    # Commit the changes with the provided commit message
     try:
         subprocess.run(["git", "commit", "-m", f"[{app_name}] {commit_message}"], check=True)
     except subprocess.CalledProcessError:
-        print("❌ Git commit failed. Ensure there are changes to commit and your Git user is configured.")
+        print("❌ Git commit failed.")
         os.chdir(current_dir)
         return False
 
-    # Create a new Git tag for this release
     try:
         subprocess.run(["git", "tag", full_tag], check=True)
         print(f"✅ Git tag '{full_tag}' created for the new release.")
     except subprocess.CalledProcessError:
-        print("❌ Git tagging failed. The tag might already exist or be invalid.")
+        print("❌ Git tagging failed.")
         os.chdir(current_dir)
         return False
 
-    # (Optional) Push the commit and tags to a remote repository:
-    # subprocess.run(["git", "push"], check=True)
-    # subprocess.run(["git", "push", "--tags"], check=True)
-
     os.chdir(current_dir)
     return True
+
+
+## Server List
+gradio_servers = {}
+
 
 #############################################
 # Deployment Function                       #
@@ -176,26 +158,21 @@ def tag_version_release(app_name, zip_path, tag, commit_message):
 
 def deploy_model(model_name, zip_path, descriptor):
     """
-    Simulates the lifecycle manager to provision a container and deploy the model.
-    It extracts the zip into a deployment folder, creates a virtual environment,
-    installs dependencies, and returns a port number on which the model will run.
+    Deploys the packaged model by extracting the zip into deployed_models/<port>,
+    creating a virtual environment, installing dependencies, and returning a port number.
     """
     print(f"Deploying model {model_name}...")
 
     deployed_dir = os.path.join("deployed_models")
     os.makedirs(deployed_dir, exist_ok=True)
 
-    # Find an available port dynamically.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind(('', 0))
     port_no = s.getsockname()[1]
     s.close()
 
-    # Create model-specific deployment directory using the port number.
     model_deploy_dir = os.path.join(deployed_dir, f"{port_no}")
     os.makedirs(model_deploy_dir, exist_ok=True)
-
-    # Extract the zip contents to the deployment directory.
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(model_deploy_dir)
 
@@ -208,62 +185,19 @@ def deploy_model(model_name, zip_path, descriptor):
     with open(deployed_descriptor_path, 'w') as dest_file:
         json.dump(descriptor_data, dest_file, indent=4)
 
-    # Create a virtual environment in the deployment directory.
     venv_path = os.path.join(model_deploy_dir, "venv")
     subprocess.run(["python", "-m", "venv", venv_path])
     pip_command = os.path.join(venv_path, "bin" if os.name != "nt" else "Scripts", "pip")
     subprocess.run([pip_command, "install", "--upgrade", "pip"])
-
-    # Install each dependency listed in the descriptor.
     for dependency in descriptor_data["requirements"]:
         subprocess.run([pip_command, "install", dependency])
-
     app.logger.info(f"Model {model_name} deployed on port {port_no}")
     return port_no
 
+
 #############################################
-# Flask Routes                              #
+# Packaging Function                       #
 #############################################
-
-# Home page: links to list models and model upload form
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-# Endpoint to handle model uploads
-@app.route("/upload", methods=["POST"])
-def upload_model():
-    required_files = ["model_definition", "model_weights", "requirements"]
-    for file_key in required_files:
-        if file_key not in request.files:
-            return f"No file provided for {file_key}", 400
-
-    model_name = request.form.get("model_name", "").strip()
-    if not model_name:
-        return "Model name is required", 400
-
-    model_def_file = request.files["model_definition"]
-    weights_file = request.files["model_weights"]
-    req_file = request.files["requirements"]
-    if model_def_file.filename == "" or weights_file.filename == "" or req_file.filename == "":
-        return "One or more files were not selected", 400
-
-    # Package model files and create descriptor and zip deployment package.
-    descriptor, zip_path = package_model(model_name, model_def_file, weights_file, req_file)
-
-    # Deploy the packaged model
-    port_no = deploy_model(model_name, zip_path, descriptor)
-    if port_no is None:
-        return "Model deployment failed", 500
-
-    descriptor["port"] = port_no
-    # Update descriptor in release folder
-    release_folder = os.path.join(UPLOAD_FOLDER, secure_filename(model_name), "release")
-    descriptor_path = os.path.join(release_folder, "descriptor.json")
-    with open(descriptor_path, 'w') as f:
-        json.dump(descriptor, f, indent=4)
-
-    return redirect(url_for("list_models"))
 
 def package_model(model_name, model_def_file, weights_file, req_file):
     """
@@ -288,7 +222,6 @@ def package_model(model_name, model_def_file, weights_file, req_file):
     
     # Build descriptor using requirements read from file object
     requirements = req_file.read().decode('utf-8').splitlines()
-    requirements_list = [re.sub(r"==.*", "", req.strip()) for req in requirements if req.strip()]
     requirements_list = [re.sub(r"==.*", "", req.strip()) for req in requirements if req.strip()]
     descriptor = {
         "model_name": model_name,
@@ -318,46 +251,48 @@ def package_model(model_name, model_def_file, weights_file, req_file):
                 zipf.write(file_path, arcname=arcname)
     return descriptor, zip_path
 
-def deploy_model(model_name, zip_path, descriptor):
-    """
-    Deploy the packaged model.
-    This function extracts the zip package to a deployed_models/<port> directory,
-    creates a virtual environment and installs dependencies.
-    Returns the allocated port number.
-    """
-    print(f"Deploying model {model_name}...")
 
-    deployed_dir = os.path.join("deployed_models")
-    os.makedirs(deployed_dir, exist_ok=True)
 
-    # Find an available port
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('', 0))
-    port_no = s.getsockname()[1]
-    s.close()
+#############################################
+# Flask Routes                              #
+#############################################
 
-    model_deploy_dir = os.path.join(deployed_dir, f"{port_no}")
-    os.makedirs(model_deploy_dir, exist_ok=True)
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(model_deploy_dir)
+# Home page: links to list models and model upload form
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-    deployed_descriptor_path = os.path.join(model_deploy_dir, "descriptor.json")
-    descriptor_data = descriptor.copy()
-    descriptor_data["deployed_at"] = datetime.datetime.now().isoformat()
-    descriptor_data["status"] = "deployed"
-    descriptor_data["port"] = port_no
-    with open(deployed_descriptor_path, 'w') as dest_file:
-        json.dump(descriptor_data, dest_file, indent=4)
+# Endpoint to handle model uploads
+@app.route("/upload", methods=["POST"])
+def upload_model():
+    required_files = ["model_definition", "model_weights", "requirements"]
+    for file_key in required_files:
+        if file_key not in request.files:
+            return f"No file provided for {file_key}", 400
 
-    # Create venv and install dependencies
-    venv_path = os.path.join(model_deploy_dir, "venv")
-    subprocess.run(["python", "-m", "venv", venv_path])
-    pip_command = os.path.join(venv_path, "bin" if os.name != "nt" else "Scripts", "pip")
-    subprocess.run([pip_command, "install", "--upgrade", "pip"])
-    for dependency in descriptor_data["requirements"]:
-        subprocess.run([pip_command, "install", dependency])
-    app.logger.info(f"Model {model_name} deployed on port {port_no}")
-    return port_no
+    model_name = request.form.get("model_name", "").strip()
+    if not model_name:
+        return "Model name is required", 400
+
+    model_def_file = request.files["model_definition"]
+    weights_file = request.files["model_weights"]
+    req_file = request.files["requirements"]
+    if model_def_file.filename == "" or weights_file.filename == "" or req_file.filename == "":
+        return "One or more files were not selected", 400
+
+    descriptor, zip_path = package_model(model_name, model_def_file, weights_file, req_file)
+    port_no = deploy_model(model_name, zip_path, descriptor)
+    if port_no is None:
+        return "Model deployment failed", 500
+
+    descriptor["port"] = port_no
+    release_folder = os.path.join(UPLOAD_FOLDER, secure_filename(model_name), "release")
+    descriptor_path = os.path.join(release_folder, "descriptor.json")
+    with open(descriptor_path, 'w') as f:
+        json.dump(descriptor, f, indent=4)
+
+    return redirect(url_for("list_models"))
+
 
 # Endpoint to list available models
 @app.route("/models", methods=["GET"])
@@ -365,7 +300,7 @@ def list_models():
     models = os.listdir(UPLOAD_FOLDER)
     return render_template("models.html", models=models)
 
-gradio_servers = {}
+
 
 @app.route("/model/<model_name>", methods=["GET"])
 def model_specific(model_name):
