@@ -156,13 +156,20 @@ gradio_servers = {}
 # Deployment Function                       #
 #############################################
 
+def log_message(log_file_path, message):
+    """Append a log message with a timestamp to the log file."""
+    timestamp = datetime.datetime.now().isoformat()
+    with open(log_file_path, "a") as lf:
+        lf.write(f"[{timestamp}] {message}\n")
+
 def deploy_model(model_name, zip_path, descriptor):
     """
-    Deploys the packaged model by extracting the zip package (which is built from the release folder)
-    into deployed_models/<port>, creating a virtual environment, installing dependencies, and returning a port number.
+    Deploys the packaged model by extracting the zip package (built from the release folder)
+    into deployed_models/<port>, creating a virtual environment, installing dependencies,
+    and logging every step. Returns a port number.
     """
+    import datetime
     print(f"Deploying model {model_name}...")
-
     deployed_dir = os.path.join("deployed_models")
     os.makedirs(deployed_dir, exist_ok=True)
 
@@ -174,17 +181,24 @@ def deploy_model(model_name, zip_path, descriptor):
     model_deploy_dir = os.path.join(deployed_dir, f"{port_no}")
     os.makedirs(model_deploy_dir, exist_ok=True)
 
+    # Create and initialize the instance log file
+    log_file_path = os.path.join(model_deploy_dir, "instance.log")
+    log_message(log_file_path, f"Starting deployment of model '{model_name}' on port {port_no}.")
+
     # Extract the zip package (which contains files from the release folder)
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(model_deploy_dir)
+    log_message(log_file_path, "Extracted deployment package.")
 
-    # Update the descriptor with deployment info and write it in the deployed directory
+    # Prepare deployment descriptor info
     deployed_descriptor_path = os.path.join(model_deploy_dir, "descriptor.json")
     descriptor_data = descriptor.copy()
-    descriptor_data["deployed_at"] = datetime.datetime.now().isoformat()
-    descriptor_data["port"] = port_no
+    if "model_name" not in descriptor_data:
+        descriptor_data["model_name"] = model_name
 
-    # Set up environment for Gradio if applicable
+    descriptor_data["deployed_at"] = datetime.datetime.now().isoformat()
+
+    # Set Gradio environment variables if applicable
     env = os.environ.copy()
     if descriptor.get("interface_type", "gradio") == "gradio":
         env["GRADIO_SERVER_PORT"] = str(port_no)
@@ -192,16 +206,24 @@ def deploy_model(model_name, zip_path, descriptor):
 
     with open(deployed_descriptor_path, "w") as dest_file:
         json.dump(descriptor_data, dest_file, indent=4)
+    log_message(log_file_path, "Deployment descriptor updated.")
 
     # Create a virtual environment and install dependencies
     venv_path = os.path.join(model_deploy_dir, "venv")
+    log_message(log_file_path, "Creating virtual environment.")
     subprocess.run(["python", "-m", "venv", venv_path], env=env, check=True)
+    log_message(log_file_path, "Virtual environment created.")
+
     pip_command = os.path.join(venv_path, "bin", "pip") if os.name != "nt" else os.path.join(venv_path, "Scripts", "pip")
     subprocess.run([pip_command, "install", "--upgrade", "pip"], check=True)
+    log_message(log_file_path, "Pip upgraded.")
+
     for dependency in descriptor_data["requirements"]:
         subprocess.run([pip_command, "install", dependency], check=True)
+        log_message(log_file_path, f"Installed dependency: {dependency}")
 
     app.logger.info(f"Model {model_name} deployed on port {port_no}")
+    log_message(log_file_path, f"Deployment completed successfully on port {port_no}.")
     return port_no
 
 
@@ -209,7 +231,8 @@ def deploy_model(model_name, zip_path, descriptor):
 # Packaging Function                       #
 #############################################
 
-# In server.py, update the package_model function
+# In server.py – update the package_model function to initialize instance_ports
+
 def package_model(model_name, model_def_file, weights_file, req_file):
     """
     Package the raw model files into a release zip and create a descriptor.
@@ -230,7 +253,6 @@ def package_model(model_name, model_def_file, weights_file, req_file):
     req_file.save(req_path)
 
     # Build descriptor using requirements read from file object
-    # Reset file pointer to start
     req_file.seek(0)
     requirements = req_file.read().decode('utf-8').splitlines()
     requirements_list = [re.sub(r"==.*", "", req.strip()) for req in requirements if req.strip()]
@@ -243,6 +265,7 @@ def package_model(model_name, model_def_file, weights_file, req_file):
         "requirements": requirements_list,
         "version": request.form.get("version", "1.0"),
         "interface_type": request.form.get("interface_type", "gradio"),
+        "instance_ports": []  # Initialize empty list for multiple ports
     }
 
     # Save descriptor in release folder
@@ -256,14 +279,12 @@ def package_model(model_name, model_def_file, weights_file, req_file):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(release_folder):
             for file in files:
-                # Avoid including the generated zip file within itself
                 if file == zip_filename:
                     continue
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, release_folder)
                 zipf.write(file_path, arcname=arcname)
     return descriptor, zip_path
-
 #############################################
 # Flask Routes                              #
 #############################################
@@ -274,6 +295,8 @@ def index():
     return render_template("index.html")
 
 # Endpoint to handle model uploads
+# In server.py – update the /upload route to append the deployed port
+
 @app.route("/upload", methods=["POST"])
 def upload_model():
     required_files = ["model_definition", "model_weights", "requirements"]
@@ -296,14 +319,20 @@ def upload_model():
     if port_no is None:
         return "Model deployment failed", 500
 
-    descriptor["port"] = port_no
+    # Update the release descriptor to track multiple instance ports
     release_folder = os.path.join(UPLOAD_FOLDER, secure_filename(model_name), "release")
     descriptor_path = os.path.join(release_folder, "descriptor.json")
+    # Load the existing descriptor, update instance_ports and save
+    with open(descriptor_path, 'r') as f:
+        descriptor_data = json.load(f)
+    if "instance_ports" not in descriptor_data:
+        descriptor_data["instance_ports"] = []
+    descriptor_data["instance_ports"].append(port_no)
+
     with open(descriptor_path, 'w') as f:
-        json.dump(descriptor, f, indent=4)
+        json.dump(descriptor_data, f, indent=4)
 
     return redirect(url_for("list_models"))
-
 
 # Endpoint to list available models
 @app.route("/models", methods=["GET"])
@@ -333,6 +362,7 @@ def model_specific(model_name):
 
     # If model deployment is not registered, deploy using our deploy_model function only.
     if model_name not in gradio_servers:
+        gradio_servers[model_name] = []
         # Locate the release zip package
         release_folder = os.path.join(UPLOAD_FOLDER, model_name, "release")
         import glob
@@ -344,7 +374,7 @@ def model_specific(model_name):
         if new_port is None:
             return "Failed to deploy model", 500
         # Do not launch a server via subprocess; simply record the deployed port.
-        gradio_servers[model_name] = {"port": new_port}
+        gradio_servers[model_name].append(new_port)
         return render_template("model_interface.html", model_name=model_name, port=new_port)
     else:
         port = gradio_servers[model_name]["port"]
@@ -356,7 +386,7 @@ def proxy_model_api(model_name, subpath):
     if model_name not in gradio_servers:
         return f"Model {model_name} is not running", 404
 
-    port = gradio_servers[model_name]["port"]
+    port = gradio_servers[model_name][0]
     target_url = f"http://localhost:{port}/{subpath}"
     params = dict(request.args)
     if "session_hash" not in params:
@@ -415,11 +445,45 @@ def api_doc_model(model_name):
         num_endpoints=num_endpoints,
         code_snippets=code_snippets
     )
+
+
 # Endpoint to display running instances for a model
+# In server.py – update the instances endpoint
+
 @app.route("/model/<model_name>/instances")
 def instances_model(model_name):
-    count = 1 if model_name in gradio_servers else 0
-    return render_template("instances.html", model_name=model_name, count=count)
+    # Get the packaged descriptor from the models folder
+    model_dir = os.path.join(UPLOAD_FOLDER, model_name)
+    descriptor_path = os.path.join(model_dir, "descriptor.json")
+    with open(descriptor_path, "r") as f:
+        descriptor_data = json.load(f)
+    ports = descriptor_data.get("instance_ports", [])
+
+    instances = []
+    deployed_dir = "deployed_models"
+    # For each port listed in instance_ports, get deployment details and logs
+    for port in ports:
+        instance_dir = os.path.join(deployed_dir, str(port))
+        deployed_at = "Unknown"
+        logs = ""
+        # Read the deployed descriptor
+        instance_descriptor_path = os.path.join(instance_dir, "descriptor.json")
+        if os.path.exists(instance_descriptor_path):
+            with open(instance_descriptor_path, "r") as f:
+                instance_descriptor = json.load(f)
+            deployed_at = instance_descriptor.get("deployed_at", "Unknown")
+        # Read the instance log file if available
+        log_file = os.path.join(instance_dir, "instance.log")
+        if os.path.exists(log_file):
+            with open(log_file, "r") as lf:
+                logs = lf.read()
+        instances.append({
+            "port": port,
+            "deployed_at": deployed_at,
+            "logs": logs
+        })
+
+    return render_template("instances.html", model_name=model_name, instances=instances)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000, use_reloader=False)

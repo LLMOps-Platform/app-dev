@@ -1,3 +1,4 @@
+<!-- In templates/instances.html -->
 {% extends "base.html" %}
 
 {% block title %}Instances Running{% endblock %}
@@ -16,6 +17,21 @@
 {% endblock %}
 
 {% block content %}
-  <h1>Instances Running</h1>
-  <p>Number of instances running: {{ count }}</p>
+  <h1>Instances Running for {{ model_name }}</h1>
+  {% if instances %}
+    {% for instance in instances %}
+      <div class="card mb-3">
+        <div class="card-header">
+          <strong>Port:</strong> {{ instance.port }} |
+          <strong>Deployed At:</strong> {{ instance.deployed_at }}
+        </div>
+        <div class="card-body">
+          <h5 class="card-title">Logs</h5>
+          <textarea class="form-control" rows="8" readonly>{{ instance.logs }}</textarea>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No running instances found for {{ model_name }}.</p>
+  {% endif %}
 {% endblock %}
