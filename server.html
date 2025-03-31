@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module server</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title">server</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/yash-chordia/Desktop/IIIT/Internals%20of%20App%20Server/Project/server.py">/home/yash-chordia/Desktop/IIIT/Internals of App Server/Project/server.py</a></td></tr></table>
+    <p></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="datetime.html">datetime</a><br>
+<a href="json.html">json</a><br>
+<a href="os.html">os</a><br>
+<a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="requests.html">requests</a><br>
+<a href="shutil.html">shutil</a><br>
+<a href="socket.html">socket</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="tempfile.html">tempfile</a><br>
+<a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"><a href="zipfile.html">zipfile</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-api_doc_model"><strong>api_doc_model</strong></a>(model_name)</dt><dd><span class="code">Displays&nbsp;the&nbsp;API&nbsp;documentation&nbsp;for&nbsp;a&nbsp;specific&nbsp;model,&nbsp;including&nbsp;dynamically&nbsp;fetched&nbsp;details&nbsp;from&nbsp;running&nbsp;instances.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;model&nbsp;for&nbsp;which&nbsp;API&nbsp;documentation&nbsp;is&nbsp;to&nbsp;be&nbsp;displayed.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;The&nbsp;rendered&nbsp;HTML&nbsp;template&nbsp;for&nbsp;the&nbsp;API&nbsp;documentation.</span></dd></dl>
+ <dl><dt><a name="-deploy_model"><strong>deploy_model</strong></a>(model_name, zip_path, descriptor)</dt><dd><span class="code">Deploys&nbsp;a&nbsp;model&nbsp;by&nbsp;extracting&nbsp;its&nbsp;ZIP&nbsp;package,&nbsp;setting&nbsp;up&nbsp;a&nbsp;virtual&nbsp;environment,&nbsp;installing&nbsp;dependencies,<br>
+and&nbsp;starting&nbsp;the&nbsp;model&nbsp;as&nbsp;a&nbsp;Gradio&nbsp;application.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;model&nbsp;to&nbsp;be&nbsp;deployed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;zip_path&nbsp;(str):&nbsp;The&nbsp;file&nbsp;path&nbsp;to&nbsp;the&nbsp;ZIP&nbsp;file&nbsp;containing&nbsp;the&nbsp;deployment&nbsp;package.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;descriptor&nbsp;(dict):&nbsp;A&nbsp;dictionary&nbsp;containing&nbsp;metadata&nbsp;and&nbsp;configuration&nbsp;for&nbsp;the&nbsp;model&nbsp;deployment.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;int:&nbsp;The&nbsp;port&nbsp;number&nbsp;on&nbsp;which&nbsp;the&nbsp;model&nbsp;is&nbsp;deployed.</span></dd></dl>
+ <dl><dt><a name="-get_next_version"><strong>get_next_version</strong></a>(app_name)</dt><dd><span class="code">Determines&nbsp;the&nbsp;next&nbsp;version&nbsp;tag&nbsp;for&nbsp;the&nbsp;given&nbsp;app/model.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;app_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;application&nbsp;or&nbsp;model&nbsp;for&nbsp;which&nbsp;the&nbsp;next&nbsp;version&nbsp;is&nbsp;to&nbsp;be&nbsp;determined.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;next&nbsp;version&nbsp;tag&nbsp;in&nbsp;the&nbsp;format&nbsp;'vX.0',&nbsp;where&nbsp;X&nbsp;is&nbsp;the&nbsp;next&nbsp;version&nbsp;number.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;previous&nbsp;versions&nbsp;exist,&nbsp;returns&nbsp;'v1.0'.</span></dd></dl>
+ <dl><dt><a name="-index"><strong>index</strong></a>()</dt><dd><span class="code">Renders&nbsp;the&nbsp;home&nbsp;page&nbsp;of&nbsp;the&nbsp;application.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;The&nbsp;rendered&nbsp;HTML&nbsp;template&nbsp;for&nbsp;the&nbsp;home&nbsp;page.</span></dd></dl>
+ <dl><dt><a name="-instances_model"><strong>instances_model</strong></a>(model_name)</dt><dd><span class="code">Displays&nbsp;the&nbsp;running&nbsp;instances&nbsp;of&nbsp;a&nbsp;specific&nbsp;model,&nbsp;including&nbsp;deployment&nbsp;logs&nbsp;and&nbsp;metadata.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;model&nbsp;for&nbsp;which&nbsp;instances&nbsp;are&nbsp;to&nbsp;be&nbsp;displayed.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;The&nbsp;rendered&nbsp;HTML&nbsp;template&nbsp;listing&nbsp;the&nbsp;running&nbsp;instances&nbsp;of&nbsp;the&nbsp;model.</span></dd></dl>
+ <dl><dt><a name="-list_models"><strong>list_models</strong></a>()</dt><dd><span class="code">Lists&nbsp;all&nbsp;available&nbsp;models&nbsp;in&nbsp;the&nbsp;system.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;The&nbsp;rendered&nbsp;HTML&nbsp;template&nbsp;displaying&nbsp;the&nbsp;list&nbsp;of&nbsp;models.</span></dd></dl>
+ <dl><dt><a name="-log_message"><strong>log_message</strong></a>(log_file_path, message)</dt><dd><span class="code">Logs&nbsp;a&nbsp;message&nbsp;with&nbsp;a&nbsp;timestamp&nbsp;to&nbsp;a&nbsp;specified&nbsp;log&nbsp;file.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;log_file_path&nbsp;(str):&nbsp;The&nbsp;file&nbsp;path&nbsp;to&nbsp;the&nbsp;log&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;message&nbsp;(str):&nbsp;The&nbsp;message&nbsp;to&nbsp;be&nbsp;logged.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</span></dd></dl>
+ <dl><dt><a name="-model_specific"><strong>model_specific</strong></a>(model_name)</dt><dd><span class="code">Displays&nbsp;the&nbsp;interface&nbsp;for&nbsp;a&nbsp;specific&nbsp;model,&nbsp;deploying&nbsp;it&nbsp;if&nbsp;necessary.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;model&nbsp;to&nbsp;be&nbsp;displayed&nbsp;or&nbsp;deployed.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;The&nbsp;rendered&nbsp;HTML&nbsp;template&nbsp;for&nbsp;the&nbsp;model&nbsp;interface,&nbsp;or&nbsp;an&nbsp;error&nbsp;message&nbsp;if&nbsp;the&nbsp;model&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+ <dl><dt><a name="-package_model"><strong>package_model</strong></a>(model_name, model_def_file, weights_file, req_file)</dt><dd><span class="code">Packages&nbsp;raw&nbsp;model&nbsp;files&nbsp;into&nbsp;a&nbsp;release&nbsp;ZIP&nbsp;file&nbsp;and&nbsp;creates&nbsp;a&nbsp;descriptor&nbsp;JSON&nbsp;file.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;model&nbsp;to&nbsp;be&nbsp;packaged.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_def_file&nbsp;(FileStorage):&nbsp;The&nbsp;uploaded&nbsp;file&nbsp;object&nbsp;for&nbsp;the&nbsp;model&nbsp;definition&nbsp;(e.g.,&nbsp;app.py).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weights_file&nbsp;(FileStorage):&nbsp;The&nbsp;uploaded&nbsp;file&nbsp;object&nbsp;for&nbsp;the&nbsp;model&nbsp;weights&nbsp;(e.g.,&nbsp;.pth&nbsp;file).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;req_file&nbsp;(FileStorage):&nbsp;The&nbsp;uploaded&nbsp;file&nbsp;object&nbsp;for&nbsp;the&nbsp;requirements.txt&nbsp;file.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tuple:&nbsp;A&nbsp;tuple&nbsp;containing:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;descriptor&nbsp;(dict):&nbsp;The&nbsp;descriptor&nbsp;metadata&nbsp;for&nbsp;the&nbsp;model.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;zip_path&nbsp;(str):&nbsp;The&nbsp;file&nbsp;path&nbsp;to&nbsp;the&nbsp;created&nbsp;ZIP&nbsp;package.</span></dd></dl>
+ <dl><dt><a name="-proxy_model_api"><strong>proxy_model_api</strong></a>(model_name, subpath)</dt><dd><span class="code">Proxies&nbsp;API&nbsp;requests&nbsp;to&nbsp;a&nbsp;running&nbsp;instance&nbsp;of&nbsp;the&nbsp;specified&nbsp;model.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;model_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;model&nbsp;to&nbsp;which&nbsp;the&nbsp;API&nbsp;request&nbsp;is&nbsp;to&nbsp;be&nbsp;proxied.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subpath&nbsp;(str):&nbsp;The&nbsp;subpath&nbsp;of&nbsp;the&nbsp;API&nbsp;endpoint&nbsp;being&nbsp;accessed.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;The&nbsp;proxied&nbsp;response&nbsp;from&nbsp;the&nbsp;model's&nbsp;API.</span></dd></dl>
+ <dl><dt><a name="-tag_version_release"><strong>tag_version_release</strong></a>(app_name, zip_path, tag, commit_message)</dt><dd><span class="code">Tags&nbsp;a&nbsp;version&nbsp;release&nbsp;for&nbsp;a&nbsp;given&nbsp;application&nbsp;by&nbsp;extracting&nbsp;a&nbsp;ZIP&nbsp;file,&nbsp;organizing&nbsp;files&nbsp;into&nbsp;a&nbsp;versioned&nbsp;folder&nbsp;structure,<br>
+and&nbsp;tagging&nbsp;the&nbsp;release&nbsp;in&nbsp;Git.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;app_name&nbsp;(str):&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;application&nbsp;or&nbsp;model.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;zip_path&nbsp;(str):&nbsp;The&nbsp;file&nbsp;path&nbsp;to&nbsp;the&nbsp;ZIP&nbsp;file&nbsp;containing&nbsp;the&nbsp;release&nbsp;package.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tag&nbsp;(str):&nbsp;The&nbsp;version&nbsp;tag&nbsp;to&nbsp;be&nbsp;applied&nbsp;(e.g.,&nbsp;'v1.0').<br>
+&nbsp;&nbsp;&nbsp;&nbsp;commit_message&nbsp;(str):&nbsp;The&nbsp;commit&nbsp;message&nbsp;to&nbsp;be&nbsp;used&nbsp;for&nbsp;the&nbsp;Git&nbsp;commit.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;bool:&nbsp;True&nbsp;if&nbsp;the&nbsp;operation&nbsp;is&nbsp;successful,&nbsp;False&nbsp;otherwise.</span></dd></dl>
+ <dl><dt><a name="-upload_model"><strong>upload_model</strong></a>()</dt><dd><span class="code">Handles&nbsp;the&nbsp;upload&nbsp;of&nbsp;model&nbsp;files,&nbsp;packages&nbsp;them&nbsp;into&nbsp;a&nbsp;release&nbsp;ZIP,&nbsp;and&nbsp;deploys&nbsp;the&nbsp;model.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;(uses&nbsp;Flask's&nbsp;request&nbsp;object&nbsp;to&nbsp;access&nbsp;form&nbsp;data&nbsp;and&nbsp;uploaded&nbsp;files).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Response:&nbsp;A&nbsp;redirect&nbsp;to&nbsp;the&nbsp;list&nbsp;of&nbsp;models&nbsp;if&nbsp;successful,&nbsp;or&nbsp;an&nbsp;error&nbsp;message&nbsp;with&nbsp;an&nbsp;appropriate&nbsp;HTTP&nbsp;status&nbsp;code.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>UPLOAD_FOLDER</strong> = 'models'<br>
+<strong>app</strong> = &lt;Flask 'server'&gt;<br>
+<strong>gradio_servers</strong> = {}<br>
+<strong>request</strong> = &lt;LocalProxy unbound&gt;</td></tr></table>
+</body></html>

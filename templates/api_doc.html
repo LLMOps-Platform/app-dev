@@ -83,8 +83,10 @@ from gradio_client import Client
 
 client = Client("{{ api_endpoints['Model API'] }}")
 result = client.predict(
-    name="Hello!!",  # Enter your name here
-    api_name="{{ endpoint }}"
+{% for param in endpoint_info.parameters %}
+  {{ param.parameter_name }}="{{ param.example_input }}",  # {{ param.label }}
+{% endfor %}
+  api_name="{{ endpoint }}"
 )
 print(result)
           </code></pre>

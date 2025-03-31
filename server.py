@@ -25,8 +25,13 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def get_next_version(app_name):
     """
     Determines the next version tag for the given app/model.
-    If the model is new (i.e. no existing release folder), returns "v1.0".
-    Otherwise, finds the highest version number among the existing releases and returns v(n+1).0.
+
+    Args:
+        app_name (str): The name of the application or model for which the next version is to be determined.
+
+    Returns:
+        str: The next version tag in the format 'vX.0', where X is the next version number.
+             If no previous versions exist, returns 'v1.0'.
     """
     app_root = os.path.join(os.getcwd(), "versioned_models", app_name)
     release_dir = os.path.join(app_root, "release")
@@ -52,7 +57,17 @@ def get_next_version(app_name):
 
 def tag_version_release(app_name, zip_path, tag, commit_message):
     """
-    Extracts the ZIP file, moves files into a versioned folder structure, and tags the release in Git.
+    Tags a version release for a given application by extracting a ZIP file, organizing files into a versioned folder structure,
+    and tagging the release in Git.
+
+    Args:
+        app_name (str): The name of the application or model.
+        zip_path (str): The file path to the ZIP file containing the release package.
+        tag (str): The version tag to be applied (e.g., 'v1.0').
+        commit_message (str): The commit message to be used for the Git commit.
+
+    Returns:
+        bool: True if the operation is successful, False otherwise.
     """
     full_tag = f"{app_name}_{tag}"  # e.g., ocr_v2.0
     temp_dir = tempfile.mkdtemp()
@@ -163,12 +178,33 @@ gradio_servers = {}
 #############################################
 
 def log_message(log_file_path, message):
-    """Append a log message with a timestamp to the log file."""
+    """
+    Logs a message with a timestamp to a specified log file.
+
+    Args:
+        log_file_path (str): The file path to the log file.
+        message (str): The message to be logged.
+
+    Returns:
+        None
+    """
     timestamp = datetime.datetime.now().isoformat()
     with open(log_file_path, "a") as lf:
         lf.write(f"[{timestamp}] {message}\n")
 
 def deploy_model(model_name, zip_path, descriptor):
+    """
+    Deploys a model by extracting its ZIP package, setting up a virtual environment, installing dependencies,
+    and starting the model as a Gradio application.
+
+    Args:
+        model_name (str): The name of the model to be deployed.
+        zip_path (str): The file path to the ZIP file containing the deployment package.
+        descriptor (dict): A dictionary containing metadata and configuration for the model deployment.
+
+    Returns:
+        int: The port number on which the model is deployed.
+    """
     import datetime
     print(f"Deploying model {model_name}...")
     deployed_dir = os.path.join("deployed_models")
@@ -243,12 +279,20 @@ def deploy_model(model_name, zip_path, descriptor):
 # Packaging Function                       #
 #############################################
 
-# In server.py – update the package_model function to initialize instance_ports
-
 def package_model(model_name, model_def_file, weights_file, req_file):
     """
-    Package the raw model files into a release zip and create a descriptor.
-    Returns (descriptor, zip_path).
+    Packages raw model files into a release ZIP file and creates a descriptor JSON file.
+
+    Args:
+        model_name (str): The name of the model to be packaged.
+        model_def_file (FileStorage): The uploaded file object for the model definition (e.g., app.py).
+        weights_file (FileStorage): The uploaded file object for the model weights (e.g., .pth file).
+        req_file (FileStorage): The uploaded file object for the requirements.txt file.
+
+    Returns:
+        tuple: A tuple containing:
+            - descriptor (dict): The descriptor metadata for the model.
+            - zip_path (str): The file path to the created ZIP package.
     """
     from datetime import datetime
     import json
@@ -304,16 +348,27 @@ def package_model(model_name, model_def_file, weights_file, req_file):
 # Flask Routes                              #
 #############################################
 
-# Home page: links to list models and model upload form
 @app.route("/")
 def index():
-    return render_template("index.html")
+    """
+    Renders the home page of the application.
 
-# Endpoint to handle model uploads
-# In server.py – update the /upload route to append the deployed port
+    Returns:
+        Response: The rendered HTML template for the home page.
+    """
+    return render_template("index.html")
 
 @app.route("/upload", methods=["POST"])
 def upload_model():
+    """
+    Handles the upload of model files, packages them into a release ZIP, and deploys the model.
+
+    Args:
+        None (uses Flask's request object to access form data and uploaded files).
+
+    Returns:
+        Response: A redirect to the list of models if successful, or an error message with an appropriate HTTP status code.
+    """
     required_files = ["model_definition", "model_weights", "requirements"]
     for file_key in required_files:
         if file_key not in request.files:
@@ -349,15 +404,32 @@ def upload_model():
 
     return redirect(url_for("list_models"))
 
-# Endpoint to list available models
 @app.route("/models", methods=["GET"])
 def list_models():
+    """
+    Lists all available models in the system.
+
+    Args:
+        None
+
+    Returns:
+        Response: The rendered HTML template displaying the list of models.
+    """
     models = os.listdir(UPLOAD_FOLDER)
     return render_template("models.html", models=models)
 
 
 @app.route("/model/<model_name>", methods=["GET"])
 def model_specific(model_name):
+    """
+    Displays the interface for a specific model, deploying it if necessary.
+
+    Args:
+        model_name (str): The name of the model to be displayed or deployed.
+
+    Returns:
+        Response: The rendered HTML template for the model interface, or an error message if the model is not found.
+    """
     if model_name not in os.listdir(UPLOAD_FOLDER):
         return "Model not found", 404
 
@@ -386,9 +458,17 @@ def model_specific(model_name):
     return redirect(url_for("instances_model", model_name=model_name))
 
 
-# Endpoint to display API documentation for the model with detailed API docs from Gradio
 @app.route("/model/<model_name>/api_doc")
 def api_doc_model(model_name):
+    """
+    Displays the API documentation for a specific model, including dynamically fetched details from running instances.
+
+    Args:
+        model_name (str): The name of the model for which API documentation is to be displayed.
+
+    Returns:
+        Response: The rendered HTML template for the API documentation.
+    """
     import json
 
     # Check that the model exists
@@ -439,11 +519,17 @@ def api_doc_model(model_name):
 
 
 
-# Endpoint to display running instances for a model
-# In server.py – update the instances endpoint
-
 @app.route("/model/<model_name>/instances")
 def instances_model(model_name):
+    """
+    Displays the running instances of a specific model, including deployment logs and metadata.
+
+    Args:
+        model_name (str): The name of the model for which instances are to be displayed.
+
+    Returns:
+        Response: The rendered HTML template listing the running instances of the model.
+    """
     # Get running instances from gradio_servers
     server_info = gradio_servers.get(model_name, {})
     running_instances = server_info.get("running_instances", [])
@@ -500,10 +586,18 @@ def instances_model(model_name):
     return render_template("instances.html", model_name=model_name, instances=instances)
 
 
-# Endpoint to handle model API requests does not get called in frontend
 @app.route("/model/<model_name>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 def proxy_model_api(model_name, subpath):
+    """
+    Proxies API requests to a running instance of the specified model.
 
+    Args:
+        model_name (str): The name of the model to which the API request is to be proxied.
+        subpath (str): The subpath of the API endpoint being accessed.
+
+    Returns:
+        Response: The proxied response from the model's API.
+    """
     # Choose the first running instance.
     if model_name not in gradio_servers:
         zip_path = os.path.join(UPLOAD_FOLDER, model_name, "release", f"{model_name}.zip")
