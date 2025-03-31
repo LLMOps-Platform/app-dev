@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}
+    API Documentation
+{% endblock %}
+
+{% block brand_text %}
+    {{ model_name }}
+{% endblock %}
+
+{% block extra_nav %}
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('api_doc_model', model_name=model_name) }}">API Doc</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
+    </li>
+{% endblock %}
+
+{% block content %}
+    <h1>API Documentation</h1>
+    <p>Provide your API documentation here.</p>
+{% endblock %}

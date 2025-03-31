@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Available Models{% endblock %}
+{% block content %}
+  <h1 class="mb-4">Available Models</h1>
+  {% if models %}
+  <div class="list-group mb-3">
+    {% for model in models %}
+      <a href="{{ url_for('model_specific', model_name=model) }}" class="list-group-item list-group-item-action">
+        {{ model }}
+      </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p>No models available.</p>
+  {% endif %}
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">Go Back Home</a>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block brand_text %}{{ model_name }}{% endblock %}
+{% block title %}Model Interface - {{ model_name }}{% endblock %}
+{% block extra_nav %}
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('api_doc_model', model_name=model_name) }}">API Doc</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
+  </li>
+{% endblock %}
+{% block content %}
+  {# Removed separate heading as model name is now in the navbar #}
+  <div class="ratio ratio-16x9 mb-3" style="height: 600px;">
+    <iframe src="http://localhost:{{ port }}/model/{{ model_name }}"></iframe>
+  </div>
+{% endblock %}
