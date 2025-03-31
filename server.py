@@ -1,3 +1,4 @@
+import random
 from flask import Flask, request, redirect, url_for, Response, render_template
 import os
 import threading
@@ -367,7 +368,7 @@ def model_specific(model_name):
 
     # If there is already a running instance, return it.
     if model_name in gradio_servers and gradio_servers[model_name]["running_instances"]:
-        instance = gradio_servers[model_name]["running_instances"][0]
+        instance = gradio_servers[model_name]["running_instances"][random.randint(0,len(gradio_servers[model_name]["running_instances"]))]
         return render_template("model_interface.html", model_name=model_name, port=instance["port"])
 
     # Otherwise, deploy the model using deploy_models.
@@ -488,11 +489,17 @@ def instances_model(model_name):
 # Endpoint to handle model API requests does not get called in frontend
 @app.route("/model/<model_name>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 def proxy_model_api(model_name, subpath):
-    if model_name not in gradio_servers or not gradio_servers[model_name]["running_instances"]:
-        return f"Model {model_name} is not running", 404
 
     # Choose the first running instance.
-    instance = gradio_servers[model_name]["running_instances"][0]
+    if model_name not in gradio_servers:
+        zip_path = os.path.join(UPLOAD_FOLDER, model_name, "release", f"{model_name}.zip")
+        descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "release", "descriptor.json")
+        with open(descriptor_path, 'r') as f:
+            descriptor = json.load(f)
+        threading.Thread(target=deploy_model, args=(model_name, zip_path, descriptor)).start()
+        return f"Model {model_name} is not running. Try calling api after a bit of time. Deployment has started.", 404
+
+    instance = random.choice(gradio_servers[model_name]["running_instances"])
     port = instance["port"]
 
     target_url = f"http://localhost:{port}/{subpath}"
