@@ -173,6 +173,7 @@ def deploy_model(model_name, zip_path, descriptor):
     print(f"Deploying model {model_name}...")
     deployed_dir = os.path.join("deployed_models")
     os.makedirs(deployed_dir, exist_ok=True)
+    deployed_dir = os.path.abspath(deployed_dir)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         port_no = s.getsockname()[1]
@@ -223,9 +224,9 @@ def deploy_model(model_name, zip_path, descriptor):
          log_message(log_file_path, f"Installed dependency: {dependency}")
 
     # Use Popen instead of run to make it non-blocking
-    python_executable = os.path.join(venv_path, 'bin', 'python') if os.name != "nt" else os.path.join(venv_path, 'Scripts', 'python')
-    cmd = [python_executable, os.path.join(model_deploy_dir, 'app.py')]
-    process = subprocess.Popen(cmd, env=env)
+    python_executable = os.path.join(venv_path, "bin", "python") if os.name != "nt" else os.path.join(venv_path, "Scripts", "python")
+    cmd = [python_executable, "app.py"]
+    process = subprocess.Popen(cmd, env=env, cwd=model_deploy_dir, start_new_session=True)
     app.logger.info(f"Model {model_name} deployed on port {port_no}")
     log_message(log_file_path, f"Deployment started successfully on port {port_no}.")
 
