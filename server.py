@@ -158,39 +158,49 @@ gradio_servers = {}
 
 def deploy_model(model_name, zip_path, descriptor):
     """
-    Deploys the packaged model by extracting the zip into deployed_models/<port>,
-    creating a virtual environment, installing dependencies, and returning a port number.
+    Deploys the packaged model by extracting the zip package (which is built from the release folder)
+    into deployed_models/<port>, creating a virtual environment, installing dependencies, and returning a port number.
     """
     print(f"Deploying model {model_name}...")
 
     deployed_dir = os.path.join("deployed_models")
     os.makedirs(deployed_dir, exist_ok=True)
 
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('', 0))
-    port_no = s.getsockname()[1]
-    s.close()
+    # Get an available port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        port_no = s.getsockname()[1]
 
     model_deploy_dir = os.path.join(deployed_dir, f"{port_no}")
     os.makedirs(model_deploy_dir, exist_ok=True)
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+
+    # Extract the zip package (which contains files from the release folder)
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(model_deploy_dir)
 
+    # Update the descriptor with deployment info and write it in the deployed directory
     deployed_descriptor_path = os.path.join(model_deploy_dir, "descriptor.json")
     descriptor_data = descriptor.copy()
     descriptor_data["deployed_at"] = datetime.datetime.now().isoformat()
-    descriptor_data["status"] = "deployed"
     descriptor_data["port"] = port_no
 
-    with open(deployed_descriptor_path, 'w') as dest_file:
+    # Set up environment for Gradio if applicable
+    env = os.environ.copy()
+    if descriptor.get("interface_type", "gradio") == "gradio":
+        env["GRADIO_SERVER_PORT"] = str(port_no)
+        env["GRADIO_ROOT_PATH"] = "/model/" + model_name
+
+    with open(deployed_descriptor_path, "w") as dest_file:
         json.dump(descriptor_data, dest_file, indent=4)
 
+    # Create a virtual environment and install dependencies
     venv_path = os.path.join(model_deploy_dir, "venv")
-    subprocess.run(["python", "-m", "venv", venv_path])
-    pip_command = os.path.join(venv_path, "bin" if os.name != "nt" else "Scripts", "pip")
-    subprocess.run([pip_command, "install", "--upgrade", "pip"])
+    subprocess.run(["python", "-m", "venv", venv_path], env=env, check=True)
+    pip_command = os.path.join(venv_path, "bin", "pip") if os.name != "nt" else os.path.join(venv_path, "Scripts", "pip")
+    subprocess.run([pip_command, "install", "--upgrade", "pip"], check=True)
     for dependency in descriptor_data["requirements"]:
-        subprocess.run([pip_command, "install", dependency])
+        subprocess.run([pip_command, "install", dependency], check=True)
+
     app.logger.info(f"Model {model_name} deployed on port {port_no}")
     return port_no
 
@@ -199,6 +209,7 @@ def deploy_model(model_name, zip_path, descriptor):
 # Packaging Function                       #
 #############################################
 
+# In server.py, update the package_model function
 def package_model(model_name, model_def_file, weights_file, req_file):
     """
     Package the raw model files into a release zip and create a descriptor.
@@ -207,51 +218,51 @@ def package_model(model_name, model_def_file, weights_file, req_file):
     from datetime import datetime
     import json
     model_folder = os.path.join(UPLOAD_FOLDER, secure_filename(model_name))
-    src_folder = os.path.join(model_folder, "src")
     release_folder = os.path.join(model_folder, "release")
-    os.makedirs(src_folder, exist_ok=True)
     os.makedirs(release_folder, exist_ok=True)
-    
-    # Save raw files in src
-    model_def_path = os.path.join(src_folder, "app.py")
-    weights_path = os.path.join(src_folder, secure_filename(weights_file.filename))
-    req_path = os.path.join(src_folder, "requirements.txt")
+
+    # Save raw files directly in release
+    model_def_path = os.path.join(release_folder, "app.py")
+    weights_path = os.path.join(release_folder, secure_filename(weights_file.filename))
+    req_path = os.path.join(release_folder, "requirements.txt")
     model_def_file.save(model_def_path)
     weights_file.save(weights_path)
     req_file.save(req_path)
-    
+
     # Build descriptor using requirements read from file object
+    # Reset file pointer to start
+    req_file.seek(0)
     requirements = req_file.read().decode('utf-8').splitlines()
     requirements_list = [re.sub(r"==.*", "", req.strip()) for req in requirements if req.strip()]
     descriptor = {
         "model_name": model_name,
         "files": {
-            "model_definition": "src/app.py",
-            "model_weights": f"src/{secure_filename(weights_file.filename)}",
+            "model_definition": "app.py",
+            "model_weights": secure_filename(weights_file.filename),
         },
         "requirements": requirements_list,
         "version": request.form.get("version", "1.0"),
         "interface_type": request.form.get("interface_type", "gradio"),
     }
-    
+
     # Save descriptor in release folder
     descriptor_path = os.path.join(release_folder, "descriptor.json")
     with open(descriptor_path, 'w') as f:
         json.dump(descriptor, f, indent=4)
-    
-    # Create zip package containing descriptor and src
+
+    # Create zip package containing descriptor and release folder files
     zip_filename = f"{secure_filename(model_name)}.zip"
     zip_path = os.path.join(release_folder, zip_filename)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(descriptor_path, arcname="descriptor.json")
-        for root, _, files in os.walk(src_folder):
+        for root, _, files in os.walk(release_folder):
             for file in files:
+                # Avoid including the generated zip file within itself
+                if file == zip_filename:
+                    continue
                 file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, model_folder)
+                arcname = os.path.relpath(file_path, release_folder)
                 zipf.write(file_path, arcname=arcname)
     return descriptor, zip_path
-
-
 
 #############################################
 # Flask Routes                              #
@@ -366,12 +377,44 @@ def proxy_model_api(model_name, subpath):
     return Response(resp.content, resp.status_code, headers)
 
 # Endpoint to display API documentation for the model
+# In server.py, update the /model/<model_name>/api_doc route
 @app.route("/model/<model_name>/api_doc")
 def api_doc_model(model_name):
+    import json
+
+    # Check that the model folder exists
     if model_name not in os.listdir(UPLOAD_FOLDER):
         return "Model not found", 404
-    return render_template("api_doc.html", model_name=model_name)
 
+    # Determine the descriptor file path.
+    # Adjust the location if your descriptor is stored in a subfolder (e.g. release)
+    descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "descriptor.json")
+    if not os.path.exists(descriptor_path):
+        return f"Descriptor file for model {model_name} not found", 404
+
+    with open(descriptor_path, "r") as f:
+        descriptor = json.load(f)
+
+    # Build API endpoints information dynamically
+    api_endpoints = {
+        "Model API": url_for("proxy_model_api", model_name=model_name, subpath="", _external=True),
+        "API Doc": url_for("api_doc_model", model_name=model_name, _external=True),
+        "Instances": url_for("instances_model", model_name=model_name, _external=True)
+    }
+
+    # Allow the descriptor to provide additional customizations.
+    # For example, the number of endpoints and custom code snippets.
+    num_endpoints = descriptor.get("num_api_endpoints", len(api_endpoints))
+    code_snippets = descriptor.get("code_snippets", None)
+
+    return render_template(
+        "api_doc.html",
+        model_name=model_name,
+        descriptor=descriptor,
+        api_endpoints=api_endpoints,
+        num_endpoints=num_endpoints,
+        code_snippets=code_snippets
+    )
 # Endpoint to display running instances for a model
 @app.route("/model/<model_name>/instances")
 def instances_model(model_name):

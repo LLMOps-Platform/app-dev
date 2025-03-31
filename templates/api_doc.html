@@ -19,5 +19,21 @@
 
 {% block content %}
     <h1>API Documentation</h1>
-    <p>Provide your API documentation here.</p>
+    <p>Model: {{ model_name }}</p>
+    <p>{{ num_endpoints }} API endpoints available</p>
+
+    <h2>API Endpoints</h2>
+    <ul>
+      {% for name, endpoint in api_endpoints.items() %}
+        <li><strong>{{ name }}:</strong> {{ endpoint }}</li>
+      {% endfor %}
+    </ul>
+
+    {% if code_snippets %}
+      <h2>Usage Examples</h2>
+      {% for snippet in code_snippets %}
+        <h3>Endpoint: {{ snippet.api_name }}</h3>
+        <pre><code class="language-python">{{ snippet.code }}</code></pre>
+      {% endfor %}
+    {% endif %}
 {% endblock %}
