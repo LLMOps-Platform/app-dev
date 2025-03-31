@@ -3,4 +3,3 @@
 *venv*
 .git
 deployed_models
-models/*/release

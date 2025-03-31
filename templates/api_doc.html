@@ -1,39 +1,97 @@
 {% extends "base.html" %}
 
 {% block title %}
-    API Documentation
+  API Documentation
 {% endblock %}
 
 {% block brand_text %}
-    {{ model_name }}
+  {{ model_name }}
 {% endblock %}
 
 {% block extra_nav %}
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('api_doc_model', model_name=model_name) }}">API Doc</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
-    </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('api_doc_model', model_name=model_name) }}">API Doc</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
+  </li>
 {% endblock %}
 
 {% block content %}
-    <h1>API Documentation</h1>
-    <p>Model: {{ model_name }}</p>
-    <p>{{ num_endpoints }} API endpoints available</p>
+  <h1>API Documentation</h1>
+  <p>Model: {{ model_name }}</p>
+  <p>{{ num_endpoints }} API endpoints available</p>
 
-    <h2>API Endpoints</h2>
-    <ul>
-      {% for name, endpoint in api_endpoints.items() %}
-        <li><strong>{{ name }}:</strong> {{ endpoint }}</li>
-      {% endfor %}
-    </ul>
+  <h2>API Endpoints</h2>
+  <ul>
+    {% for name, endpoint in api_endpoints.items() %}
+    <li><strong>{{ name }}:</strong> {{ endpoint }}</li>
+    {% endfor %}
+  </ul>
 
-    {% if code_snippets %}
-      <h2>Usage Examples</h2>
-      {% for snippet in code_snippets %}
-        <h3>Endpoint: {{ snippet.api_name }}</h3>
-        <pre><code class="language-python">{{ snippet.code }}</code></pre>
+  {% if code_snippets %}
+    <h2>Usage Examples</h2>
+    {% for snippet in code_snippets %}
+    <h3>Endpoint: {{ snippet.api_name }}</h3>
+    <pre><code class="language-python">{{ snippet.code }}</code></pre>
+    {% endfor %}
+  {% endif %}
+
+  {% if detailed_api_docs %}
+    <h2>Detailed API Documentation</h2>
+    {% if detailed_api_docs is mapping and detailed_api_docs.named_endpoints %}
+      {% for endpoint, endpoint_info in detailed_api_docs.named_endpoints.items() %}
+        <h3>Endpoint: {{ endpoint }}</h3>
+        <h4>Parameters</h4>
+        <ul>
+          {% for param in endpoint_info.parameters %}
+            <li>
+              <strong>{{ param.parameter_name }}</strong>:
+              <ul>
+                <li>Label: {{ param.label }}</li>
+                <li>Component: {{ param.component }}</li>
+                <li>Example Input: {{ param.example_input }}</li>
+                <li>Python Type: {{ param.python_type.type }}</li>
+                <li>Request Type: {{ param.type.type }}</li>
+                {% if param.parameter_default %}
+                  <li>Default: {{ param.parameter_default }}</li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endfor %}
+        </ul>
+        <h4>Returns</h4>
+        <ul>
+          {% for ret in endpoint_info.returns %}
+            <li>
+              <strong>{{ ret.label }}</strong>:
+              <ul>
+                <li>Component: {{ ret.component }}</li>
+                <li>Python Type: {{ ret.python_type.type }}</li>
+                <li>Response Type: {{ ret.type.type }}</li>
+              </ul>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if endpoint_info.show_api and endpoint == '/predict' %}
+          <h4>Client Code Snippet for {{ endpoint }}</h4>
+          <p>1. Install the python client:</p>
+          <pre><code class="language-bash">$ pip install gradio_client</code></pre>
+          <p>2. Example usage:</p>
+          <pre><code class="language-python">
+from gradio_client import Client
+
+client = Client("{{ api_endpoints['Model API'] }}")
+result = client.predict(
+    name="Hello!!",  # Enter your name here
+    api_name="{{ endpoint }}"
+)
+print(result)
+          </code></pre>
+        {% endif %}
       {% endfor %}
+    {% else %}
+      <pre><code class="language-json">{{ detailed_api_docs | tojson(indent=2) }}</code></pre>
     {% endif %}
+  {% endif %}
 {% endblock %}

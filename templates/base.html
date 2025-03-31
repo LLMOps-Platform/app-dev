@@ -9,7 +9,15 @@
   <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
-      <a class="navbar-brand" href="{{ url_for('index') }}">{% block brand_text %}Model Server{% endblock %}</a>
+      {% if model_name is defined %}
+        <a class="navbar-brand" href="{{ url_for('model_specific', model_name=model_name) }}">
+          {{ model_name }}
+        </a>
+      {% else %}
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+          Model Server
+        </a>
+      {% endif %}
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>

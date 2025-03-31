@@ -1,0 +1,15 @@
+{
+    "model_name": "greet",
+    "files": {
+        "model_definition": "app.py",
+        "model_weights": "mnist_cnn.pth"
+    },
+    "requirements": [
+        "gradio"
+    ],
+    "version": "1.0",
+    "interface_type": "gradio",
+    "instance_ports": [
+        48525
+    ]
+}

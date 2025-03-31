@@ -368,7 +368,7 @@ def model_specific(model_name):
 
     # If there is already a running instance, return it.
     if model_name in gradio_servers and gradio_servers[model_name]["running_instances"]:
-        instance = gradio_servers[model_name]["running_instances"][random.randint(0,len(gradio_servers[model_name]["running_instances"]))]
+        instance = random.choice(gradio_servers[model_name]["running_instances"])
         return render_template("model_interface.html", model_name=model_name, port=instance["port"])
 
     # Otherwise, deploy the model using deploy_models.
@@ -385,18 +385,16 @@ def model_specific(model_name):
     return redirect(url_for("instances_model", model_name=model_name))
 
 
-
-# Endpoint to display API documentation for the model
+# Endpoint to display API documentation for the model with detailed API docs from Gradio
 @app.route("/model/<model_name>/api_doc")
 def api_doc_model(model_name):
     import json
 
-    # Check that the model folder exists
-    if (model_name not in os.listdir(UPLOAD_FOLDER)):
+    # Check that the model exists
+    if model_name not in os.listdir(UPLOAD_FOLDER):
         return "Model not found", 404
 
     # Determine the descriptor file path.
-    # Adjust the location if your descriptor is stored in a subfolder (e.g. release)
     descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "release/descriptor.json")
     if not os.path.exists(descriptor_path):
         return f"Descriptor file for model {model_name} not found", 404
@@ -404,16 +402,29 @@ def api_doc_model(model_name):
     with open(descriptor_path, "r") as f:
         descriptor = json.load(f)
 
-    # Build API endpoints information dynamically
+    # Build API endpoints information dynamically.
     api_endpoints = {
         "Model API": url_for("proxy_model_api", model_name=model_name, subpath="", _external=True),
         "API Doc": url_for("api_doc_model", model_name=model_name, _external=True),
         "Instances": url_for("instances_model", model_name=model_name, _external=True)
     }
-
-    # Allow the descriptor to provide additional customizations.
     num_endpoints = descriptor.get("num_api_endpoints", len(api_endpoints))
     code_snippets = descriptor.get("code_snippets", None)
+
+    # Retrieve API definition from one of the running Gradio instances.
+    detailed_api_docs = None
+    if model_name in gradio_servers and gradio_servers[model_name]["running_instances"]:
+        instance = gradio_servers[model_name]["running_instances"][0]
+        port = instance.get("port")
+        try:
+            # Use the /config endpoint which is typically available in Gradio apps.
+            response = requests.get(f"http://127.0.0.1:{port}/gradio_api/info", timeout=5)
+            response.raise_for_status()
+            detailed_api_docs = response.json()
+        except Exception as e:
+            detailed_api_docs = f"Error fetching API definition from instance at port {port}: {e}"
+    else:
+        detailed_api_docs = "No running instances available for API definition."
 
     return render_template(
         "api_doc.html",
@@ -421,8 +432,10 @@ def api_doc_model(model_name):
         descriptor=descriptor,
         api_endpoints=api_endpoints,
         num_endpoints=num_endpoints,
-        code_snippets=code_snippets
+        code_snippets=code_snippets,
+        detailed_api_docs=detailed_api_docs
     )
+
 
 
 # Endpoint to display running instances for a model
@@ -496,8 +509,10 @@ def proxy_model_api(model_name, subpath):
         descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "release", "descriptor.json")
         with open(descriptor_path, 'r') as f:
             descriptor = json.load(f)
-        threading.Thread(target=deploy_model, args=(model_name, zip_path, descriptor)).start()
-        return f"Model {model_name} is not running. Try calling api after a bit of time. Deployment has started.", 404
+        deploy_model(model_name, zip_path, descriptor)
+
+    while not gradio_servers[model_name]["running_instances"]:
+        time.sleep(0.1)
 
     instance = random.choice(gradio_servers[model_name]["running_instances"])
     port = instance["port"]
