@@ -19,153 +19,6 @@ UPLOAD_FOLDER = "models"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 #############################################
-# Helper Function: Determine Next Version   #
-#############################################
-
-def get_next_version(app_name):
-    """
-    Determines the next version tag for the given app/model.
-
-    Args:
-        app_name (str): The name of the application or model for which the next version is to be determined.
-
-    Returns:
-        str: The next version tag in the format 'vX.0', where X is the next version number.
-             If no previous versions exist, returns 'v1.0'.
-    """
-    app_root = os.path.join(os.getcwd(), "versioned_models", app_name)
-    release_dir = os.path.join(app_root, "release")
-    if not os.path.exists(release_dir):
-        return "v1.0"
-    versions = []
-    for entry in os.listdir(release_dir):
-        if entry.startswith("v"):
-            try:
-                # Assume tag format is v<number>.0
-                number = int(entry[1:].split(".")[0])
-                versions.append(number)
-            except ValueError:
-                continue
-    if not versions:
-        return "v1.0"
-    new_version_number = max(versions) + 1
-    return f"v{new_version_number}.0"
-
-#############################################
-# Tag/Versioning Function (integrated)      #
-#############################################
-
-def tag_version_release(app_name, zip_path, tag, commit_message):
-    """
-    Tags a version release for a given application by extracting a ZIP file, organizing files into a versioned folder structure,
-    and tagging the release in Git.
-
-    Args:
-        app_name (str): The name of the application or model.
-        zip_path (str): The file path to the ZIP file containing the release package.
-        tag (str): The version tag to be applied (e.g., 'v1.0').
-        commit_message (str): The commit message to be used for the Git commit.
-
-    Returns:
-        bool: True if the operation is successful, False otherwise.
-    """
-    full_tag = f"{app_name}_{tag}"  # e.g., ocr_v2.0
-    temp_dir = tempfile.mkdtemp()
-    try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
-    except zipfile.BadZipFile:
-        print(f"Error: The file '{zip_path}' is not a valid zip file.")
-        return False
-
-    extracted_files = os.listdir(temp_dir)
-    code_files = []
-    model_file = None
-    for filename in extracted_files:
-        if filename in ["app.py", "requirements.txt"]:
-            code_files.append(filename)
-        elif filename.endswith(".pt") or filename.endswith(".pth"):
-            model_file = filename
-
-    if "app.py" not in code_files or "requirements.txt" not in code_files:
-        print("Error: app.py and/or requirements.txt not found in the zip file.")
-        shutil.rmtree(temp_dir)
-        return False
-    if model_file is None:
-        print("Error: No PyTorch model file (.pt or .pth) found in the zip file.")
-        shutil.rmtree(temp_dir)
-        return False
-
-    app_root = os.path.join(os.getcwd(), "versioned_models", app_name)
-    release_dir = os.path.join(app_root, "release", tag)
-    models_dir = os.path.join(app_root, "models")
-    os.makedirs(app_root, exist_ok=True)
-    os.makedirs(release_dir, exist_ok=True)
-    os.makedirs(models_dir, exist_ok=True)
-
-    for file in code_files:
-        src = os.path.join(temp_dir, file)
-        dst = os.path.join(release_dir, file)
-        shutil.move(src, dst)
-    src_model = os.path.join(temp_dir, model_file)
-    dst_model = os.path.join(models_dir, model_file)
-    shutil.move(src_model, dst_model)
-    shutil.rmtree(temp_dir)
-
-    # Git operations (initialization, LFS, commit, tagging) follow...
-    if not os.path.isdir(os.path.join(app_root, ".git")):
-        try:
-            subprocess.run(["git", "init", app_root], check=True)
-            print(f"Initialized a new Git repository in {app_root}")
-        except subprocess.CalledProcessError:
-            print("❌ Git init failed. Ensure Git is installed.")
-            return False
-
-    current_dir = os.getcwd()
-    os.chdir(app_root)
-    try:
-        subprocess.run(["git", "lfs", "install"], check=True)
-    except subprocess.CalledProcessError:
-        print("❌ Git LFS installation failed.")
-        os.chdir(current_dir)
-        return False
-
-    lfs_track_path = os.path.join("models", model_file)
-    try:
-        subprocess.run(["git", "lfs", "track", lfs_track_path], check=True)
-    except subprocess.CalledProcessError:
-        print("❌ Git LFS tracking failed.")
-        os.chdir(current_dir)
-        return False
-
-    try:
-        subprocess.run(["git", "add", "."], check=True)
-    except subprocess.CalledProcessError:
-        print("❌ Git add failed.")
-        os.chdir(current_dir)
-        return False
-
-    try:
-        subprocess.run(["git", "commit", "-m", f"[{app_name}] {commit_message}"], check=True)
-    except subprocess.CalledProcessError:
-        print("❌ Git commit failed.")
-        os.chdir(current_dir)
-        return False
-
-    try:
-        subprocess.run(["git", "tag", full_tag], check=True)
-        print(f"✅ Git tag '{full_tag}' created for the new release.")
-    except subprocess.CalledProcessError:
-        print("❌ Git tagging failed.")
-        os.chdir(current_dir)
-        return False
-
-    os.chdir(current_dir)
-    return True
-
-
-
-#############################################
 # Global Gradio Server Structure            #
 #############################################
 # New structure: { model_name: { "running_instances": [ { "port": int, "process": Process or None } ],
@@ -176,6 +29,10 @@ gradio_servers = {}
 #############################################
 # Deployment Function                       #
 #############################################
+
+# Kafka Config
+KAFKA_BROKER = "10.1.37.28:9092"
+KAFKA_TOPIC = "logs"
 
 def log_message(log_file_path, message):
     """

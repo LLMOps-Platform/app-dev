@@ -12,6 +12,10 @@
 {% block content %}
   {# Removed separate heading as model name is now in the navbar #}
   <div class="ratio ratio-16x9 mb-3" style="height: 600px;">
+    {% if ip_address is not None %}
+    <iframe src="http://{{ ip_address }}:{{ port }}/model/{{ model_name }}"></iframe>
+    {% else %}
     <iframe src="http://localhost:{{ port }}/model/{{ model_name }}"></iframe>
+    {% endif %}
   </div>
 {% endblock %}
