@@ -748,18 +748,17 @@ def model_specific(model_name):
     # Check if model has instances in app_servers
     if model_name in app_servers:
         # Find a running web app instance
-        web_instance = None
-        for instance in app_servers[model_name]["web_apps"]:
-            if not instance["deploying"] and instance["status"] == "running":
-                web_instance = instance
-                break
-        
-        # Find a running inference app instance for API info
-        inf_instance = None
-        for instance in app_servers[model_name]["inference_apps"]:
-            if not instance["deploying"] and instance["status"] == "running":
-                inf_instance = instance
-                break
+        web_candidates = [
+            instance for instance in app_servers[model_name]["web_apps"]
+            if not instance["deploying"] and instance["status"] == "running"
+        ]
+        web_instance = random.choice(web_candidates) if web_candidates else None
+
+        inf_candidates = [
+            instance for instance in app_servers[model_name]["inference_apps"]
+            if not instance["deploying"] and instance["status"] == "running"
+        ]
+        inf_instance = random.choice(inf_candidates) if inf_candidates else None
         
         # If we have a web app, show it
         if web_instance:
@@ -1091,35 +1090,39 @@ def proxy_model_api(model_name, subpath):
     Proxies API requests to an available inference API backend instance.
     """
     from flask import jsonify
-    
+    import random
+
     # Check if any inference APIs are available
     available_instance = None
-    
+
     if model_name in app_servers:
-        for instance in app_servers[model_name]["inference_apps"]:
-            if not instance["deploying"] and instance["status"] == "running":
-                available_instance = instance
-                break
-    
+        available_instances = [
+            instance
+            for instance in app_servers[model_name]["inference_apps"]
+            if not instance["deploying"] and instance["status"] == "running"
+        ]
+        if available_instances:
+            available_instance = random.choice(available_instances)
+
     # If no instance available, try to deploy one
     if not available_instance:
         descriptor_path = os.path.join(UPLOAD_FOLDER, model_name, "release/descriptor.json")
         zip_path = os.path.join(UPLOAD_FOLDER, model_name, "release", f"{model_name}.zip")
-        
+
         if not os.path.exists(descriptor_path) or not os.path.exists(zip_path):
             return jsonify({"error": "Model not found or not properly packaged"}), 404
-        
+
         try:
             with open(descriptor_path, 'r') as f:
                 descriptor = json.load(f)
             available_instance = deploy_instance(model_name, zip_path, descriptor, "inference_app")
         except Exception as e:
             return jsonify({"error": f"{str(e)}"}), 500
-    
+
     # Make the request to the inference API
     port = available_instance["port"]
     target_url = f"http://localhost:{port}/{subpath}"
-    
+
     resp = requests.request(
         method=request.method,
         url=target_url,
@@ -1129,10 +1132,10 @@ def proxy_model_api(model_name, subpath):
         cookies=request.cookies,
         allow_redirects=False
     )
-    
+
     excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
     headers = [(name, value) for name, value in resp.raw.headers.items() if name.lower() not in excluded_headers]
-    
+
     return Response(resp.content, resp.status_code, headers)
 
 if __name__ == "__main__":
