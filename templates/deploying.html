@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Deploying {{ model_name }}{% endblock %}
+{% block brand_text %}{{ model_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h2>Deployment in Progress</h2>
+        </div>
+        <div class="card-body text-center">
+            <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            
+            <h4 class="mb-4">{{ message }}</h4>
+            
+            <div class="progress mb-4">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+            </div>
+            
+            <p>This page will automatically refresh to check the deployment status.</p>
+            
+            <div class="mt-4">
+                <a href="{{ url_for('list_models') }}" class="btn btn-secondary">Back to Models List</a>
+                <a href="{{ url_for('model_specific', model_name=model_name) }}" class="btn btn-primary">Refresh Now</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if refresh_seconds %}
+<script>
+    // Automatically refresh the page after specified seconds
+    setTimeout(function() {
+        window.location.reload();
+    }, {{ refresh_seconds * 1000 }});
+</script>
+{% endif %}
+{% endblock %}

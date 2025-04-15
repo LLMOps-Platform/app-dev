@@ -1,0 +1,86 @@
+{
+    "model_name": "ocr_app",
+    "version": "",
+    "created_at": "2025-04-15T18:45:59.906139",
+    "author": "",
+    "description": "",
+    "project_root": "/home/yash-chordia/Desktop/IIIT/Internals of App Server/Project",
+    "paths": {
+        "model_folder": "/home/yash-chordia/Desktop/IIIT/Internals of App Server/Project/models/ocr_app",
+        "release_folder": "/home/yash-chordia/Desktop/IIIT/Internals of App Server/Project/models/ocr_app/release",
+        "web_app_folder": "/home/yash-chordia/Desktop/IIIT/Internals of App Server/Project/models/ocr_app/src/web_app",
+        "inference_app_folder": "/home/yash-chordia/Desktop/IIIT/Internals of App Server/Project/models/ocr_app/src/inference_app"
+    },
+    "files": {
+        "web_app_folder": "web_app",
+        "inference_app_folder": "inference_app",
+        "model_weights": [
+            "mnist_cnn.pt"
+        ]
+    },
+    "requirements": {
+        "combined": [
+            "requests",
+            "torch",
+            "Flask",
+            "torchvision",
+            "pillow"
+        ],
+        "web_app": [
+            "Flask",
+            "requests"
+        ],
+        "inference_app": [
+            "Flask",
+            "torch",
+            "torchvision",
+            "pillow"
+        ]
+    },
+    "interface_type": "dual",
+    "app_relationship": {
+        "web_app": "frontend",
+        "inference_app": "api_backend"
+    },
+    "instances": [
+        {
+            "web_app": {
+                "id": "a7b68337-0ff9-4b1e-8504-a003fe9eb981",
+                "port": 58991
+            },
+            "inference_app": {
+                "id": "a0b77d58-4e66-4291-a091-a8fb9df94e73",
+                "port": 58577
+            },
+            "created_at": "2025-04-15T18:47:42.882748"
+        },
+        {
+            "id": "66681644-62bd-44d4-9694-dafb55dd22dd",
+            "type": "inference_app",
+            "port": 49381,
+            "created_at": "2025-04-15T18:48:46.481103"
+        },
+        {
+            "web_app": {
+                "id": "be9fa405-817b-4f43-96c1-3f48b7474373",
+                "port": 43477
+            },
+            "inference_app": {
+                "id": "ccd2922c-ccbd-4461-a847-0026ec21163e",
+                "port": 48423
+            },
+            "created_at": "2025-04-15T18:54:34.990829"
+        }
+    ],
+    "api_endpoints": {
+        "predict": {
+            "method": "POST",
+            "description": "Make predictions using the model",
+            "parameters": "Depends on the specific model implementation"
+        },
+        "health": {
+            "method": "GET",
+            "description": "Check if the API is running properly"
+        }
+    }
+}

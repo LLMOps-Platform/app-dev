@@ -1,17 +1,75 @@
 {% extends "base.html" %}
+{% block brand_text %}Models{% endblock %}
 {% block title %}Available Models{% endblock %}
 {% block content %}
-  <h1 class="mb-4">Available Models</h1>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Available Models</h1>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">
+      <i class="fas fa-plus-circle"></i> Upload New Model
+    </a>
+  </div>
+  
   {% if models %}
-  <div class="list-group mb-3">
+  <div class="row row-cols-1 row-cols-md-3 g-4">
     {% for model in models %}
-      <a href="{{ url_for('model_specific', model_name=model) }}" class="list-group-item list-group-item-action">
-        {{ model }}
-      </a>
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">{{ model }}</h5>
+          <p class="card-text text-muted">
+            <span id="status-{{ model }}">
+              <span class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </span>
+              Checking status...
+            </span>
+          </p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <div class="d-grid gap-2">
+            <a href="{{ url_for('model_specific', model_name=model) }}" class="btn btn-outline-primary">View Model</a>
+            <a href="{{ url_for('instances_model', model_name=model) }}" class="btn btn-outline-secondary">Manage Instances</a>
+          </div>
+        </div>
+      </div>
+    </div>
     {% endfor %}
   </div>
   {% else %}
-  <p>No models available.</p>
+  <div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i> No models available. Please upload a model to get started.
+  </div>
   {% endif %}
-  <a href="{{ url_for('index') }}" class="btn btn-secondary">Go Back Home</a>
+</div>
+
+<script>
+  // Function to check deployment status for each model
+  async function checkModelStatus() {
+    const models = {{ models|tojson }};
+    
+    for (let model of models) {
+      try {
+        const response = await fetch(`/model/${model}/status`);
+        const data = await response.json();
+        
+        const statusElement = document.getElementById(`status-${model}`);
+        if (data.deploying) {
+          statusElement.innerHTML = '<span class="badge bg-warning">Deploying</span>';
+        } else if (data.instances && data.instances.length > 0) {
+          statusElement.innerHTML = `<span class="badge bg-success">Running</span> ${data.instances.length} instances`;
+        } else {
+          statusElement.innerHTML = '<span class="badge bg-secondary">Not Running</span>';
+        }
+      } catch(err) {
+        console.error(`Error checking status for ${model}:`, err);
+        const statusElement = document.getElementById(`status-${model}`);
+        statusElement.textContent = 'Status unknown';
+      }
+    }
+  }
+  
+  // Check status when page loads
+  document.addEventListener('DOMContentLoaded', checkModelStatus);
+</script>
 {% endblock %}

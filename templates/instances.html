@@ -12,26 +12,223 @@
         <a class="nav-link" href="{{ url_for('api_doc_model', model_name=model_name) }}">API Doc</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
+        <a class="nav-link active" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('model_specific', model_name=model_name) }}">Model Interface</a>
     </li>
 {% endblock %}
 
 {% block content %}
-  <h1>Instances Running for {{ model_name }}</h1>
-  {% if instances %}
-    {% for instance in instances %}
-      <div class="card mb-3">
-        <div class="card-header">
-          <strong>Port:</strong> {{ instance.port }} |
-          <strong>Deployed At:</strong> {{ instance.deployed_at }}
-        </div>
-        <div class="card-body">
-          <h5 class="card-title">Logs</h5>
-          <textarea class="form-control" rows="8" readonly>{{ instance.logs }}</textarea>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Instances Running for {{ model_name }}</h1>
+    {% if descriptor %}
+    <span class="badge bg-info">Version: {{ descriptor.version }}</span>
+    {% endif %}
+  </div>
+  
+  <div id="deployment-status"></div>
+  
+  <div class="mb-4 d-flex gap-2">
+    <form action="{{ url_for('create_model_instance', model_name=model_name) }}" method="post" id="web-app-form">
+      <input type="hidden" name="app_type" value="web_app">
+      <button type="submit" class="btn btn-primary" id="web-app-btn">
+        <i class="fas fa-plus-circle"></i> Create Web App Instance
+      </button>
+    </form>
+    
+    <form action="{{ url_for('create_model_instance', model_name=model_name) }}" method="post" id="inference-app-form">
+      <input type="hidden" name="app_type" value="inference_app">
+      <button type="submit" class="btn btn-success" id="inference-app-btn">
+        <i class="fas fa-plus-circle"></i> Create Inference API Instance
+      </button>
+    </form>
+  </div>
+  
+  {% if is_dual_app %}
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>
+          This model supports both frontend web applications and backend inference APIs.
+          Each instance can be managed independently.
         </div>
       </div>
-    {% endfor %}
-  {% else %}
-    <p>No running instances found for {{ model_name }}.</p>
+    </div>
   {% endif %}
+  
+  {% if instances %}
+    <div class="mb-3">
+      <h3>Frontend Instances</h3>
+      {% for instance in instances if "Web App" in instance.type %}
+        <div class="card mb-4">
+          <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ instance.type }} <span class="badge bg-secondary">ID: {{ instance.instance_id[:8] }}</span></h5>
+            <span class="badge {% if instance.status == 'running' %}bg-success{% else %}bg-danger{% endif %}">
+              {{ instance.status|capitalize }}
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Port:</strong> {{ instance.port }}
+              </div>
+              <div class="col-md-4">
+                <strong>URL:</strong> 
+                <a href="{{ instance.url }}" target="_blank">{{ instance.url }}</a>
+              </div>
+              <div class="col-md-4">
+                <strong>Deployed At:</strong> 
+                <span title="{{ instance.deployed_at }}">
+                  {{ instance.deployed_at[:16] }}
+                </span>
+              </div>
+            </div>
+            
+            <h6>Deployment Logs</h6>
+            <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.9em; background-color: #f8f9fa;">
+              <pre style="white-space: pre-wrap;">{{ instance.logs }}</pre>
+            </div>
+            
+            {% if instance.status == 'running' %}
+            <div class="mt-3">
+              <form action="{{ url_for('stop_instance', model_name=model_name) }}" method="post" style="display: inline;">
+                <input type="hidden" name="instance_id" value="{{ instance.instance_id }}">
+                <input type="hidden" name="instance_type" value="{{ instance.type }}">
+                <button type="submit" class="btn btn-danger">
+                  <i class="fas fa-stop-circle"></i> Stop Instance
+                </button>
+              </form>
+              
+              <a href="{{ instance.url }}" target="_blank" class="btn btn-primary ms-2">
+                <i class="fas fa-external-link-alt"></i> Open Interface
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    
+    <div>
+      <h3>Backend API Instances</h3>
+      {% for instance in instances if "Inference API" in instance.type %}
+        <div class="card mb-4">
+          <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ instance.type }} <span class="badge bg-secondary">ID: {{ instance.instance_id[:8] }}</span></h5>
+            <span class="badge {% if instance.status == 'running' %}bg-success{% else %}bg-danger{% endif %}">
+              {{ instance.status|capitalize }}
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Port:</strong> {{ instance.port }}
+              </div>
+              <div class="col-md-4">
+                <strong>URL:</strong> 
+                <a href="{{ instance.url }}" target="_blank">{{ instance.url }}</a>
+              </div>
+              <div class="col-md-4">
+                <strong>Deployed At:</strong> 
+                <span title="{{ instance.deployed_at }}">
+                  {{ instance.deployed_at[:16] }}
+                </span>
+              </div>
+            </div>
+            
+            <h6>Deployment Logs</h6>
+            <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.9em; background-color: #f8f9fa;">
+              <pre style="white-space: pre-wrap;">{{ instance.logs }}</pre>
+            </div>
+            
+            {% if instance.status == 'running' %}
+            <div class="mt-3">
+              <form action="{{ url_for('stop_instance', model_name=model_name) }}" method="post" style="display: inline;">
+                <input type="hidden" name="instance_id" value="{{ instance.instance_id }}">
+                <input type="hidden" name="instance_type" value="{{ instance.type }}">
+                <button type="submit" class="btn btn-danger">
+                  <i class="fas fa-stop-circle"></i> Stop Instance
+                </button>
+              </form>
+              
+              <a href="{{ instance.url }}" target="_blank" class="btn btn-primary ms-2">
+                <i class="fas fa-external-link-alt"></i> Access API
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-warning">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      No running instances found for {{ model_name }}.
+    </div>
+    
+    <div class="mt-4">
+      <a href="{{ url_for('model_specific', model_name=model_name) }}" class="btn btn-primary">
+        Deploy Model
+      </a>
+    </div>
+  {% endif %}
+  
+  <script>
+    // Function to check if any deployments are in progress
+    async function checkDeploymentStatus() {
+      try {
+        const response = await fetch("{{ url_for('model_status', model_name=model_name) }}");
+        const data = await response.json();
+        
+        const statusElem = document.getElementById('deployment-status');
+        const webAppBtn = document.getElementById('web-app-btn');
+        const inferenceAppBtn = document.getElementById('inference-app-btn');
+        
+        // Check if we have any running instances of each type
+        const hasWebApp = data.instances.some(inst => inst.type === "web_app");
+        const hasInferenceApp = data.instances.some(inst => inst.type === "inference_app");
+        
+        if (data.deploying) {
+          let statusMessage = "Deployment in progress. Please wait...";
+          
+          // Create more specific messages based on what's missing
+          if (!hasWebApp && !hasInferenceApp) {
+            statusMessage = "Deploying both web and inference applications. Please wait...";
+          } else if (!hasWebApp) {
+            statusMessage = "Deploying web application. Please wait...";
+          } else if (!hasInferenceApp) {
+            statusMessage = "Deploying inference API. Please wait...";
+          }
+          
+          statusElem.innerHTML = `
+            <div class="alert alert-warning mb-3">
+              <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-3" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <strong>${statusMessage}</strong>
+              </div>
+            </div>
+          `;
+          
+          // Disable buttons only for the type that's being deployed
+          if (!hasWebApp) webAppBtn.disabled = true;
+          if (!hasInferenceApp) inferenceAppBtn.disabled = true;
+          
+          // Check again in 3 seconds
+          setTimeout(checkDeploymentStatus, 3000);
+        } else {
+          statusElem.innerHTML = '';
+          webAppBtn.disabled = false;
+          inferenceAppBtn.disabled = false;
+        }
+      } catch(err) {
+        console.error("Error checking deployment status:", err);
+      }
+    }
+    
+    // Check status when page loads
+    document.addEventListener('DOMContentLoaded', checkDeploymentStatus);
+  </script>
 {% endblock %}

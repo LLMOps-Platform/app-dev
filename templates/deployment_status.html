@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block brand_text %}{{ model_name }}{% endblock %}
+{% block title %}Deploying {{ model_name }}{% endblock %}
+{% block extra_nav %}
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('api_doc_model', model_name=model_name) }}">API Doc</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('instances_model', model_name=model_name) }}">Instances Running</a>
+  </li>
+{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="card shadow-sm">
+    <div class="card-header bg-info text-white">
+      <h2 class="mb-0">Deployment in Progress</h2>
+    </div>
+    <div class="card-body text-center p-5">
+      <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      
+      <h3 class="mb-4">{{ message }}</h3>
+      
+      <div class="progress mb-4">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+      </div>
+      
+      <p class="text-muted">This page will automatically check deployment status.</p>
+      
+      <div class="mt-4">
+        <div class="btn-group">
+          <a href="{{ url_for('list_models') }}" class="btn btn-outline-secondary">
+            Back to Models
+          </a>
+          <a href="{{ url_for('instances_model', model_name=model_name) }}" class="btn btn-outline-info">
+            View Instances
+          </a>
+          <a href="{{ redirect_url }}" class="btn btn-outline-primary">
+            Refresh Now
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer text-muted">
+      <div class="d-flex justify-content-between align-items-center">
+        <span>Model: {{ model_name }}</span>
+        {% if descriptor %}
+        <span class="badge bg-info">Version: {{ descriptor.version }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if redirect_seconds %}
+<script>
+  // Automatically refresh the page after specified seconds
+  setTimeout(function() {
+    checkDeploymentStatus();
+  }, {{ redirect_seconds * 1000 }});
+  
+  // Function to check deployment status via AJAX
+  async function checkDeploymentStatus() {
+    try {
+      const response = await fetch("{{ url_for('model_status', model_name=model_name) }}");
+      const data = await response.json();
+      
+      if (!data.deploying) {
+        // Deployment is complete, redirect to the model page
+        window.location.href = "{{ redirect_url }}";
+      } else {
+        // Still deploying, wait and check again
+        setTimeout(checkDeploymentStatus, 3000);
+      }
+    } catch(err) {
+      console.error("Error checking deployment status:", err);
+      // On error, just redirect after waiting
+      setTimeout(function() {
+        window.location.href = "{{ redirect_url }}";
+      }, 5000);
+    }
+  }
+</script>
+{% endif %}
+{% endblock %}

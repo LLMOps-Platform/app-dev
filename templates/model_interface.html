@@ -10,12 +10,84 @@
   </li>
 {% endblock %}
 {% block content %}
-  {# Removed separate heading as model name is now in the navbar #}
-  <div class="ratio ratio-16x9 mb-3" style="height: 600px;">
-    {% if ip_address is not None %}
-    <iframe src="http://{{ ip_address }}:{{ port }}/model/{{ model_name }}"></iframe>
-    {% else %}
-    <iframe src="http://localhost:{{ port }}/model/{{ model_name }}"></iframe>
-    {% endif %}
-  </div>
+  {% if is_deploying %}
+    <div class="alert alert-info">
+      <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm me-3" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <strong>{{ deployment_message }}</strong>
+      </div>
+    </div>
+    <div class="progress mb-4">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+    </div>
+    <p class="text-center">This page will automatically refresh in 5 seconds...</p>
+    <script>
+      setTimeout(function() {
+        window.location.reload();
+      }, 5000);
+    </script>
+  {% elif is_dual_app %}
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Web Application (Frontend)</h5>
+            <a href="{{ web_app_url }}" class="btn btn-outline-primary btn-sm" target="_blank">Open in New Tab</a>
+          </div>
+          <div class="card-body p-0">
+            <div style="height: 600px;">
+              <iframe src="{{ web_app_url }}" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+          </div>
+          <div class="card-footer text-muted small d-flex justify-content-between align-items-center">
+            <span>Running on port {{ web_app_port }}</span>
+            {% if instance_id %}
+            <span class="badge bg-secondary">Instance: {{ instance_id[:8] }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">API Information</h5>
+          </div>
+          <div class="card-body">
+            <p>This model has a backend inference API available at:</p>
+            <div class="bg-light p-2 mb-3">
+              <code>{{ inference_app_url }}</code>
+            </div>
+            
+            <p>You can also access the inference API through the proxy endpoint:</p>
+            <div class="bg-light p-2">
+              <code>{{ url_for('proxy_model_api', model_name=model_name, subpath='predict', _external=True) }}</code>
+            </div>
+            
+            <div class="mt-3">
+              <a href="{{ url_for('api_doc_model', model_name=model_name) }}" class="btn btn-primary">
+                View API Documentation
+              </a>
+              <a href="{{ inference_app_url }}" target="_blank" class="btn btn-outline-secondary ms-2">
+                Access Inference API Directly
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    {# Original single app view #}
+    <div class="ratio ratio-16x9 mb-3" style="height: 600px;">
+      {% if ip_address is not None %}
+      <iframe src="http://{{ ip_address }}:{{ port }}/model/{{ model_name }}"></iframe>
+      {% else %}
+      <iframe src="http://localhost:{{ port }}/model/{{ model_name }}"></iframe>
+      {% endif %}
+    </div>
+  {% endif %}
 {% endblock %}
